@@ -360,18 +360,21 @@ fun CategoryTag(category: String) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AddTaskDialog(onDismiss: () -> Unit, onPost: (Task) -> Unit) {
-    var title by remember { mutableStateOf("") }
-    var description by remember { mutableStateOf("") }
-    var pay by remember { mutableStateOf("") }
-    var date by remember { mutableStateOf("") }
-    var time by remember { mutableStateOf("") }
-    var location by remember { mutableStateOf("") }
+fun AddTaskDialog(initialTask: Task? = null, onDismiss: () -> Unit, onPost: (Task) -> Unit) {
+    var title by remember { mutableStateOf(initialTask?.title ?: "") }
+    var description by remember { mutableStateOf(initialTask?.description ?: "") }
+    var pay by remember { mutableStateOf(initialTask?.reward?.replace("₹", "") ?: "") }
+    
+    // Attempt to split date and time if deadline is in expected format
+    val deadlineParts = initialTask?.deadline?.split(", ")
+    var date by remember { mutableStateOf(deadlineParts?.getOrNull(0) ?: "") }
+    var time by remember { mutableStateOf(deadlineParts?.getOrNull(1) ?: "") }
+    var location by remember { mutableStateOf(initialTask?.location ?: "") }
 
     Dialog(onDismissRequest = onDismiss) {
         Card(shape = RoundedCornerShape(24.dp), colors = CardDefaults.cardColors(containerColor = AppSurface)) {
             Column(modifier = Modifier.padding(24.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                Text(text = "Post a New Task", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                Text(text = if (initialTask == null) "Post a New Task" else "Edit Task", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
 
                 // Photo Upload Section
                 Box(
@@ -456,14 +459,14 @@ fun AddTaskDialog(onDismiss: () -> Unit, onPost: (Task) -> Unit) {
                 Button(
                     onClick = { 
                         if (title.isNotBlank() && description.isNotBlank()) {
-                            onPost(Task(title, description, "$date, $time", location, "Task", "₹$pay"))
+                            onPost(Task(title, description, "$date, $time", location, initialTask?.category ?: "Task", "₹$pay"))
                         }
                     },
                     modifier = Modifier.fillMaxWidth().height(50.dp),
                     shape = RoundedCornerShape(12.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = AppTeal)
                 ) {
-                    Text("Post Task", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                    Text(if (initialTask == null) "Post Task" else "Save Changes", fontSize = 16.sp, fontWeight = FontWeight.Bold)
                 }
             }
         }

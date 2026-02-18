@@ -32,12 +32,10 @@ import com.example.taskbug.ui.auth.AuthViewModel
 import kotlinx.coroutines.delay
 
 /* ---------- COLORS ---------- */
-
 private val Primary = Color(0xFF0F766E)
 private val Background = Color(0xFFF9FAFB)
 
 /* ---------- MAIN ACTIVITY ---------- */
-
 class MainActivity : ComponentActivity() {
     private val authViewModel: AuthViewModel by viewModels()
 
@@ -47,11 +45,12 @@ class MainActivity : ComponentActivity() {
         setContent {
             MaterialTheme {
                 val userLoggedIn by authViewModel.userLoggedIn.collectAsState()
+                val isLoading by authViewModel.isLoading.collectAsState()
+                val authError by authViewModel.authError.collectAsState()
 
                 if (userLoggedIn) {
-                    AppNavGraph(authViewModel = authViewModel) // If user is logged in, show the main app
+                    AppNavGraph(authViewModel = authViewModel)
                 } else {
-                    // Otherwise, show the original login/signup flow
                     var screen by remember { mutableStateOf("splash") }
 
                     when (screen) {
@@ -60,12 +59,16 @@ class MainActivity : ComponentActivity() {
                         "login" -> LoginScreen(
                             onLogin = { email, password -> authViewModel.signIn(email, password) },
                             onSignup = { screen = "signup" },
-                            onForgot = { screen = "forgot" }
+                            onForgot = { screen = "forgot" },
+                            isLoading = isLoading,
+                            error = authError
                         )
 
                         "signup" -> SignupScreen(
                             onBack = { screen = "login" },
-                            onDone = { name, email, phone, password -> authViewModel.signUp(name, email, phone, password) }
+                            onDone = { name, email, phone, password -> authViewModel.signUp(name, email, phone, password) },
+                            isLoading = isLoading,
+                            error = authError
                         )
 
                         "forgot" -> ForgotPasswordScreen(
@@ -75,7 +78,7 @@ class MainActivity : ComponentActivity() {
 
                         "otp" -> OtpScreen(
                             onBack = { screen = "login" },
-                            onDone = { /* This is now handled by the login state */ }
+                            onDone = { /* Handled by auth state */ }
                         )
                     }
                 }
@@ -85,7 +88,6 @@ class MainActivity : ComponentActivity() {
 }
 
 /* ---------- SPLASH ---------- */
-
 @Composable
 fun SplashScreen(onFinish: () -> Unit) {
     val scale = remember { Animatable(0.6f) }
@@ -113,11 +115,10 @@ fun SplashScreen(onFinish: () -> Unit) {
 }
 
 /* ---------- TOP BAR ---------- */
-
 @Composable
 fun BackTopBar(title: String, onBack: () -> Unit) {
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         IconButton(onClick = onBack) {
@@ -128,12 +129,13 @@ fun BackTopBar(title: String, onBack: () -> Unit) {
 }
 
 /* ---------- LOGIN ---------- */
-
 @Composable
 fun LoginScreen(
     onLogin: (String, String) -> Unit,
     onSignup: () -> Unit,
-    onForgot: () -> Unit
+    onForgot: () -> Unit,
+    isLoading: Boolean,
+    error: String?
 ) {
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
@@ -156,17 +158,27 @@ fun LoginScreen(
         AppTextField("Email", email) { email = it }
         AppTextField("Password", password, password = true) { password = it }
 
+        if (error != null) {
+            Text(text = error, color = Color.Red, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp))
+        }
+
         TextButton(onClick = onForgot, modifier = Modifier.align(Alignment.End)) {
             Text("Forgot Password?", color = Primary)
         }
 
         Spacer(Modifier.height(16.dp))
-        Button(
-            onClick = { onLogin(email, password) },
-            modifier = Modifier.fillMaxWidth().height(50.dp),
-            shape = RoundedCornerShape(12.dp)
-        ) {
-            Text("Login")
+        
+        if (isLoading) {
+            CircularProgressIndicator(color = Primary)
+        } else {
+            Button(
+                onClick = { onLogin(email, password) },
+                modifier = Modifier.fillMaxWidth().height(50.dp),
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = Primary)
+            ) {
+                Text("Login")
+            }
         }
 
         TextButton(onClick = onSignup) {
@@ -176,9 +188,13 @@ fun LoginScreen(
 }
 
 /* ---------- SIGNUP ---------- */
-
 @Composable
-fun SignupScreen(onBack: () -> Unit, onDone: (String, String, String, String) -> Unit) {
+fun SignupScreen(
+    onBack: () -> Unit, 
+    onDone: (String, String, String, String) -> Unit,
+    isLoading: Boolean,
+    error: String?
+) {
     var name by remember { mutableStateOf("") }
     var email by remember { mutableStateOf("") }
     var phone by remember { mutableStateOf("") }
@@ -195,19 +211,28 @@ fun SignupScreen(onBack: () -> Unit, onDone: (String, String, String, String) ->
         AppTextField("Phone Number", phone, KeyboardType.Phone) { phone = it }
         AppTextField("Password", password, password = true) { password = it }
 
+        if (error != null) {
+            Text(text = error, color = Color.Red, fontSize = 12.sp, modifier = Modifier.padding(bottom = 8.dp))
+        }
+
         Spacer(Modifier.height(20.dp))
-        Button(
-            onClick = { onDone(name, email, phone, password) },
-            modifier = Modifier.fillMaxWidth().height(50.dp),
-            shape = RoundedCornerShape(12.dp)
-        ) {
-            Text("Sign Up")
+        
+        if (isLoading) {
+            CircularProgressIndicator(color = Primary, modifier = Modifier.align(Alignment.CenterHorizontally))
+        } else {
+            Button(
+                onClick = { onDone(name, email, phone, password) },
+                modifier = Modifier.fillMaxWidth().height(50.dp),
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = Primary)
+            ) {
+                Text("Sign Up")
+            }
         }
     }
 }
 
 /* ---------- FORGOT PASSWORD ---------- */
-
 @Composable
 fun ForgotPasswordScreen(onBack: () -> Unit, onNext: () -> Unit) {
     var value by remember { mutableStateOf("") }
@@ -224,7 +249,8 @@ fun ForgotPasswordScreen(onBack: () -> Unit, onNext: () -> Unit) {
         Button(
             onClick = onNext,
             modifier = Modifier.fillMaxWidth().height(50.dp),
-            shape = RoundedCornerShape(12.dp)
+            shape = RoundedCornerShape(12.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = Primary)
         ) {
             Text("Send OTP")
         }
@@ -232,7 +258,6 @@ fun ForgotPasswordScreen(onBack: () -> Unit, onNext: () -> Unit) {
 }
 
 /* ---------- OTP ---------- */
-
 @Composable
 fun OtpScreen(onBack: () -> Unit, onDone: () -> Unit) {
     var otp by remember { mutableStateOf("") }
@@ -251,7 +276,8 @@ fun OtpScreen(onBack: () -> Unit, onDone: () -> Unit) {
         Button(
             onClick = onDone,
             modifier = Modifier.fillMaxWidth().height(50.dp),
-            shape = RoundedCornerShape(12.dp)
+            shape = RoundedCornerShape(12.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = Primary)
         ) {
             Text("Verify OTP")
         }
@@ -259,7 +285,6 @@ fun OtpScreen(onBack: () -> Unit, onDone: () -> Unit) {
 }
 
 /* ---------- COMMON TEXT FIELD ---------- */
-
 @Composable
 fun AppTextField(
     label: String,
@@ -277,7 +302,11 @@ fun AppTextField(
             PasswordVisualTransformation()
         else VisualTransformation.None,
         shape = RoundedCornerShape(14.dp),
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier.fillMaxWidth(),
+        colors = OutlinedTextFieldDefaults.colors(
+            focusedBorderColor = Primary,
+            focusedLabelColor = Primary
+        )
     )
     Spacer(Modifier.height(12.dp))
 }

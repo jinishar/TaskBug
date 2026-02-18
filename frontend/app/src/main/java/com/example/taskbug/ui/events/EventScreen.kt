@@ -167,18 +167,31 @@ fun EventCard(event: EventItem, onClick: () -> Unit) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AddEventDialog(onDismiss: () -> Unit, onPost: (EventItem) -> Unit) {
-    var title by remember { mutableStateOf("") }
-    var description by remember { mutableStateOf("") }
-    var venue by remember { mutableStateOf("") }
-    var date by remember { mutableStateOf("") }
-    var time by remember { mutableStateOf("") }
-    var category by remember { mutableStateOf("Technology") }
+fun AddEventDialog(
+    initialEvent: EventItem? = null,
+    onDismiss: () -> Unit, 
+    onPost: (EventItem) -> Unit
+) {
+    var title by remember { mutableStateOf(initialEvent?.title ?: "") }
+    var description by remember { mutableStateOf(initialEvent?.description ?: "") }
+    var venue by remember { mutableStateOf(initialEvent?.venue ?: "") }
+    
+    // Split date and time if initialEvent is present
+    val initialDate = initialEvent?.dateTime?.split(", ")?.getOrNull(0) ?: ""
+    val initialTime = initialEvent?.dateTime?.split(", ")?.getOrNull(1) ?: ""
+    
+    var date by remember { mutableStateOf(initialDate) }
+    var time by remember { mutableStateOf(initialTime) }
+    var category by remember { mutableStateOf(initialEvent?.category ?: "Technology") }
 
     Dialog(onDismissRequest = onDismiss) {
         Card(shape = RoundedCornerShape(24.dp), colors = CardDefaults.cardColors(containerColor = AppSurface)) {
             Column(modifier = Modifier.padding(24.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                Text("Add New Event", fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                Text(
+                    text = if (initialEvent == null) "Add New Event" else "Edit Event", 
+                    fontSize = 20.sp, 
+                    fontWeight = FontWeight.Bold
+                )
 
                 OutlinedTextField(value = title, onValueChange = { title = it }, label = { Text("Title") }, modifier = Modifier.fillMaxWidth())
                 OutlinedTextField(value = description, onValueChange = { description = it }, label = { Text("Description") }, modifier = Modifier.fillMaxWidth(), minLines = 2)
@@ -192,13 +205,24 @@ fun AddEventDialog(onDismiss: () -> Unit, onPost: (EventItem) -> Unit) {
                 Button(
                     onClick = {
                         if (title.isNotBlank() && description.isNotBlank()) {
-                            onPost(EventItem(title, description, "$date, $time", venue, category))
+                            onPost(EventItem(
+                                title = title, 
+                                description = description, 
+                                dateTime = "$date, $time", 
+                                venue = venue, 
+                                category = category,
+                                currentParticipants = initialEvent?.currentParticipants ?: 0,
+                                maxParticipants = initialEvent?.maxParticipants ?: 50
+                            ))
                         }
                     },
                     modifier = Modifier.fillMaxWidth().height(50.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = AppTeal)
                 ) {
-                    Text("Submit Event", fontWeight = FontWeight.Bold)
+                    Text(
+                        text = if (initialEvent == null) "Submit Event" else "Update Event", 
+                        fontWeight = FontWeight.Bold
+                    )
                 }
             }
         }
