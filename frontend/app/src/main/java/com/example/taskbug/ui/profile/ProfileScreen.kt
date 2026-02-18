@@ -1,5 +1,8 @@
 package com.example.taskbug.ui.profile
 
+import android.app.Activity
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -11,7 +14,10 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.*
+import androidx.compose.material.icons.automirrored.filled.Assignment
+import androidx.compose.material.icons.automirrored.filled.HelpCenter
+import androidx.compose.material.icons.automirrored.filled.Logout
+import androidx.compose.material.icons.automirrored.filled.StarHalf
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -21,11 +27,18 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.taskbug.ui.auth.AuthViewModel
+import com.google.android.libraries.places.api.Places
+import com.google.android.libraries.places.api.model.Place
+import com.google.android.libraries.places.widget.Autocomplete
+import com.google.android.libraries.places.widget.model.AutocompleteActivityMode
 
 /* ---------- DESIGN SYSTEM ---------- */
 
@@ -34,10 +47,36 @@ private val LightGrayBackground = Color(0xFFF9FAFB)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ProfileScreen() {
+fun ProfileScreen(authViewModel: AuthViewModel = viewModel()) {
     val scrollState = rememberScrollState()
     var selectedAvatar by remember { mutableStateOf(bugAvatars.first()) }
     var showAvatarDialog by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+
+    val userProfile by authViewModel.userProfile.collectAsState()
+    var userLocation by remember(userProfile) { mutableStateOf(userProfile?.location ?: "") }
+
+    // Initialize Places SDK - IMPORTANT: Replace "YOUR_API_KEY" with your actual key
+    if (!Places.isInitialized()) {
+        Places.initialize(context.applicationContext, "YOUR_API_KEY")
+    }
+
+    // Launcher for the Google Places Autocomplete activity
+    val placesLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            val place = Autocomplete.getPlaceFromIntent(result.data!!)
+            userLocation = place.address ?: ""
+        }
+    }
+
+    // Function to launch the Place Picker
+    fun launchPlacePicker() {
+        val fields = listOf(Place.Field.ID, Place.Field.NAME, Place.Field.ADDRESS, Place.Field.LAT_LNG)
+        val intent = Autocomplete.IntentBuilder(AutocompleteActivityMode.OVERLAY, fields).build(context)
+        placesLauncher.launch(intent)
+    }
 
     if (showAvatarDialog) {
         AvatarSelectionDialog(
@@ -93,13 +132,13 @@ fun ProfileScreen() {
 
             // User Info
             Text(
-                text = "Alex Johnson",
+                text = userProfile?.name ?: "Loading...",
                 fontSize = 24.sp,
                 fontWeight = FontWeight.Bold,
                 color = Color(0xFF111827)
             )
             Text(
-                text = "@alex_tasker",
+                text = userProfile?.email ?: "",
                 fontSize = 15.sp,
                 color = Color(0xFF6B7280),
                 modifier = Modifier.padding(top = 2.dp)
@@ -169,10 +208,15 @@ fun ProfileScreen() {
                     modifier = Modifier.padding(bottom = 16.dp)
                 )
 
-                EditableField(label = "Name", initialValue = "Alex Johnson")
-                EditableField(label = "Email", initialValue = "alex.johnson@taskbug.com")
-                EditableField(label = "Phone", initialValue = "+1 234 567 890")
-                EditableField(label = "Address", initialValue = "123 Maple Avenue, Springfield")
+                EditableField(label = "Name", initialValue = userProfile?.name ?: "")
+                EditableField(label = "Email", initialValue = userProfile?.email ?: "")
+                EditableField(label = "Phone", initialValue = userProfile?.phone ?: "")
+                LocationField(
+                    location = userLocation,
+                    onLocationChange = { userLocation = it },
+                    onSearchLocation = { launchPlacePicker() },
+                    onSaveLocation = { authViewModel.updateUserLocation(userLocation) }
+                )
             }
 
             Spacer(modifier = Modifier.height(24.dp))
@@ -201,7 +245,7 @@ fun ProfileScreen() {
 
             // --- LOGOUT BUTTON ---
             Button(
-                onClick = { /* Logout Logic */ },
+                onClick = { authViewModel.signOut() },
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 20.dp)
@@ -221,6 +265,43 @@ fun ProfileScreen() {
             Spacer(modifier = Modifier.height(40.dp))
         }
     }
+}
+
+@Composable
+fun LocationField(
+    location: String,
+    onLocationChange: (String) -> Unit,
+    onSearchLocation: () -> Unit,
+    onSaveLocation: () -> Unit
+) {
+    OutlinedTextField(
+        value = location,
+        onValueChange = onLocationChange,
+        label = { Text("Location") },
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 6.dp),
+        shape = RoundedCornerShape(12.dp),
+        colors = OutlinedTextFieldDefaults.colors(
+            focusedBorderColor = TaskBugTeal,
+            unfocusedBorderColor = Color(0xFFE5E7EB),
+            focusedContainerColor = Color.White,
+            unfocusedContainerColor = Color.White,
+            cursorColor = TaskBugTeal,
+            focusedLabelColor = TaskBugTeal
+        ),
+        trailingIcon = {
+            Row {
+                IconButton(onClick = onSearchLocation) {
+                    Icon(Icons.Default.Search, contentDescription = "Search Location", tint = TaskBugTeal)
+                }
+                IconButton(onClick = onSaveLocation) {
+                    Icon(Icons.Default.Save, contentDescription = "Save Location", tint = TaskBugTeal)
+                }
+            }
+        },
+        singleLine = true
+    )
 }
 
 @Composable

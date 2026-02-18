@@ -5,6 +5,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -46,14 +47,26 @@ data class Task(
 fun TasksScreen() {
     var showAddTaskDialog by remember { mutableStateOf(false) }
     var selectedTask by remember { mutableStateOf<Task?>(null) }
+    var searchQuery by remember { mutableStateOf("") }
+    var selectedCategory by remember { mutableStateOf("All") }
+
+    val categories = listOf("All", "Shopping", "Home", "Pets", "Technical")
     
-    // Mock Data updated to Rupees
-    val tasks = remember {
-        listOf(
+    val tasksList = remember {
+        mutableStateListOf(
             Task("Groceries Delivery", "Need someone to pick up groceries from the local store.", "Oct 25, 5:00 PM", "Brooklyn, NY", "Shopping", "₹1,200"),
             Task("Furniture Assembly", "Help needed to assemble a new IKEA desk.", "Oct 26, 10:00 AM", "Queens, NY", "Home", "₹2,500"),
             Task("Dog Walking", "Walk my friendly golden retriever for 30 minutes.", "Oct 26, 4:00 PM", "Central Park", "Pets", "₹800")
         )
+    }
+
+    val filteredTasks = remember(searchQuery, selectedCategory, tasksList.size) {
+        tasksList.filter { task ->
+            val matchesSearch = task.title.contains(searchQuery, ignoreCase = true) || 
+                              task.description.contains(searchQuery, ignoreCase = true)
+            val matchesCategory = selectedCategory == "All" || task.category == selectedCategory
+            matchesSearch && matchesCategory
+        }
     }
 
     Scaffold(
@@ -70,29 +83,101 @@ fun TasksScreen() {
             }
         }
     ) { padding ->
-        LazyColumn(
+        Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(padding),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+                .padding(padding)
         ) {
-            item {
+            // Header with Search and Filter
+            Column(modifier = Modifier.padding(16.dp)) {
                 Text(
                     text = "Active Tasks",
                     fontSize = 24.sp,
                     fontWeight = FontWeight.Bold,
                     color = TextPrimary,
-                    modifier = Modifier.padding(bottom = 8.dp)
+                    modifier = Modifier.padding(bottom = 12.dp)
                 )
+                
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = { searchQuery = it },
+                    placeholder = { Text("Search tasks...") },
+                    modifier = Modifier.fillMaxWidth(),
+                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                    trailingIcon = {
+                        if (searchQuery.isNotEmpty()) {
+                            IconButton(onClick = { searchQuery = "" }) {
+                                Icon(Icons.Default.Clear, contentDescription = "Clear")
+                            }
+                        }
+                    },
+                    shape = RoundedCornerShape(12.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = AppTeal,
+                        unfocusedBorderColor = AppBorder
+                    ),
+                    singleLine = true
+                )
+                
+                Spacer(modifier = Modifier.height(12.dp))
+                
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    items(categories) { category ->
+                        val isSelected = selectedCategory == category
+                        FilterChip(
+                            selected = isSelected,
+                            onClick = { selectedCategory = category },
+                            label = { Text(category) },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = AppTeal.copy(alpha = 0.1f),
+                                selectedLabelColor = AppTeal,
+                                labelColor = TextSecondary
+                            ),
+                            border = FilterChipDefaults.filterChipBorder(
+                                enabled = true,
+                                selected = isSelected,
+                                borderColor = AppBorder,
+                                selectedBorderColor = AppTeal,
+                                borderWidth = 1.dp,
+                                selectedBorderWidth = 1.dp
+                            )
+                        )
+                    }
+                }
             }
-            items(tasks) { task ->
-                TaskCard(task, onClick = { selectedTask = task })
+
+            if (filteredTasks.isEmpty()) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Icon(Icons.Default.SearchOff, contentDescription = null, modifier = Modifier.size(64.dp), tint = TextSecondary.copy(alpha = 0.5f))
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text("No tasks found", color = TextSecondary)
+                    }
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 80.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    items(filteredTasks) { task ->
+                        TaskCard(task, onClick = { selectedTask = task })
+                    }
+                }
             }
         }
 
         if (showAddTaskDialog) {
-            AddTaskDialog(onDismiss = { showAddTaskDialog = false })
+            AddTaskDialog(
+                onDismiss = { showAddTaskDialog = false },
+                onPost = { newTask ->
+                    tasksList.add(0, newTask)
+                    showAddTaskDialog = false
+                }
+            )
         }
 
         selectedTask?.let {
@@ -275,7 +360,7 @@ fun CategoryTag(category: String) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AddTaskDialog(onDismiss: () -> Unit) {
+fun AddTaskDialog(onDismiss: () -> Unit, onPost: (Task) -> Unit) {
     var title by remember { mutableStateOf("") }
     var description by remember { mutableStateOf("") }
     var pay by remember { mutableStateOf("") }
@@ -369,7 +454,11 @@ fun AddTaskDialog(onDismiss: () -> Unit) {
                 Spacer(modifier = Modifier.height(8.dp))
 
                 Button(
-                    onClick = { onDismiss() },
+                    onClick = { 
+                        if (title.isNotBlank() && description.isNotBlank()) {
+                            onPost(Task(title, description, "$date, $time", location, "Task", "₹$pay"))
+                        }
+                    },
                     modifier = Modifier.fillMaxWidth().height(50.dp),
                     shape = RoundedCornerShape(12.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = AppTeal)

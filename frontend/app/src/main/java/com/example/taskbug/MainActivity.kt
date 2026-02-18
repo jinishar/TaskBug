@@ -3,6 +3,7 @@ package com.example.taskbug
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.viewModels
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
@@ -14,7 +15,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.ui.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
@@ -25,51 +27,57 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import kotlinx.coroutines.delay
 import com.example.taskbug.navigation.AppNavGraph
+import com.example.taskbug.ui.auth.AuthViewModel
+import kotlinx.coroutines.delay
 
 /* ---------- COLORS ---------- */
 
 private val Primary = Color(0xFF0F766E)
 private val Background = Color(0xFFF9FAFB)
-private val TextPrimary = Color(0xFF111827)
 
 /* ---------- MAIN ACTIVITY ---------- */
 
 class MainActivity : ComponentActivity() {
+    private val authViewModel: AuthViewModel by viewModels()
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
         setContent {
             MaterialTheme {
+                val userLoggedIn by authViewModel.userLoggedIn.collectAsState()
 
-                var screen by remember { mutableStateOf("splash") }
+                if (userLoggedIn) {
+                    AppNavGraph(authViewModel = authViewModel) // If user is logged in, show the main app
+                } else {
+                    // Otherwise, show the original login/signup flow
+                    var screen by remember { mutableStateOf("splash") }
 
-                when (screen) {
-                    "splash" -> SplashScreen { screen = "login" }
+                    when (screen) {
+                        "splash" -> SplashScreen { screen = "login" }
 
-                    "login" -> LoginScreen(
-                        onLogin = { screen = "dashboard" },
-                        onSignup = { screen = "signup" },
-                        onForgot = { screen = "forgot" }
-                    )
+                        "login" -> LoginScreen(
+                            onLogin = { email, password -> authViewModel.signIn(email, password) },
+                            onSignup = { screen = "signup" },
+                            onForgot = { screen = "forgot" }
+                        )
 
-                    "signup" -> SignupScreen(
-                        onBack = { screen = "login" },
-                        onDone = { screen = "otp" }
-                    )
+                        "signup" -> SignupScreen(
+                            onBack = { screen = "login" },
+                            onDone = { name, email, phone, password -> authViewModel.signUp(name, email, phone, password) }
+                        )
 
-                    "forgot" -> ForgotPasswordScreen(
-                        onBack = { screen = "login" },
-                        onNext = { screen = "otp" }
-                    )
+                        "forgot" -> ForgotPasswordScreen(
+                            onBack = { screen = "login" },
+                            onNext = { screen = "otp" }
+                        )
 
-                    "otp" -> OtpScreen(
-                        onBack = { screen = "login" },
-                        onDone = { screen = "dashboard" } // ✅ CONNECTED TO DASHBOARD
-                    )
-
-                    "dashboard" -> AppNavGraph() // ✅ DASHBOARD ENTRY POINT
+                        "otp" -> OtpScreen(
+                            onBack = { screen = "login" },
+                            onDone = { /* This is now handled by the login state */ }
+                        )
+                    }
                 }
             }
         }
@@ -123,7 +131,7 @@ fun BackTopBar(title: String, onBack: () -> Unit) {
 
 @Composable
 fun LoginScreen(
-    onLogin: () -> Unit,
+    onLogin: (String, String) -> Unit,
     onSignup: () -> Unit,
     onForgot: () -> Unit
 ) {
@@ -154,7 +162,7 @@ fun LoginScreen(
 
         Spacer(Modifier.height(16.dp))
         Button(
-            onClick = onLogin,
+            onClick = { onLogin(email, password) },
             modifier = Modifier.fillMaxWidth().height(50.dp),
             shape = RoundedCornerShape(12.dp)
         ) {
@@ -170,7 +178,7 @@ fun LoginScreen(
 /* ---------- SIGNUP ---------- */
 
 @Composable
-fun SignupScreen(onBack: () -> Unit, onDone: () -> Unit) {
+fun SignupScreen(onBack: () -> Unit, onDone: (String, String, String, String) -> Unit) {
     var name by remember { mutableStateOf("") }
     var email by remember { mutableStateOf("") }
     var phone by remember { mutableStateOf("") }
@@ -189,7 +197,7 @@ fun SignupScreen(onBack: () -> Unit, onDone: () -> Unit) {
 
         Spacer(Modifier.height(20.dp))
         Button(
-            onClick = onDone,
+            onClick = { onDone(name, email, phone, password) },
             modifier = Modifier.fillMaxWidth().height(50.dp),
             shape = RoundedCornerShape(12.dp)
         ) {
