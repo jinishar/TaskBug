@@ -14,17 +14,8 @@ import com.example.taskbug.ui.profile.ProfileScreen
 @Composable
 fun DashboardRoot() {
     val navController = rememberNavController()
-    val currentBackStack by navController.currentBackStackEntryAsState()
-    val currentRoute = currentBackStack?.destination?.route
-
-    val showSearchBar = currentRoute == "tasks" || currentRoute == "events"
 
     Scaffold(
-        topBar = {
-            if (showSearchBar) {
-                TopSearchBar(navController)
-            }
-        },
         bottomBar = {
             BottomBar(navController = navController)
         }
