@@ -39,6 +39,9 @@ class AuthViewModel : ViewModel() {
     val userLoggedIn = _userLoggedIn.asStateFlow()
 
     init {
+        // **Temporary fix**: Uncomment the line below to always force logout on app start
+        // signOut()
+
         if (auth.currentUser != null) {
             fetchCurrentUserProfile()
         }
