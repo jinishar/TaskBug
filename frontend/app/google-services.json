@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "35470647085",
+    "project_id": "taskbugcu",
+    "storage_bucket": "taskbugcu.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:35470647085:android:5d4f55e57af4f84ef5fda4",
+        "android_client_info": {
+          "package_name": "com.example.taskbug"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAtlQb0m62fTfplP3muD4jvaT-9x8VZLBs"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
