@@ -53,7 +53,6 @@ fun EventsScreen() {
 
     val categories = listOf("All", "Technology", "Volunteer", "Networking")
     
-    // Using mutableStateListOf to ensure the UI updates when items are added
     val eventsList = remember {
         mutableStateListOf(
             EventItem("Tech Workshop 2024", "Join us for a deep dive into modern Android development.", "Oct 25, 10:00 AM", "Innovation Hub, NY", "Technology", 42, 50),
@@ -85,12 +84,10 @@ fun EventsScreen() {
         }
     ) { padding ->
         Column(modifier = Modifier.fillMaxSize().padding(padding)) {
-            // Header
             Column(modifier = Modifier.padding(16.dp)) {
                 Text("Upcoming Events", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
                 Spacer(Modifier.height(12.dp))
                 
-                // Search Bar
                 OutlinedTextField(
                     value = searchQuery,
                     onValueChange = { searchQuery = it },
@@ -108,7 +105,6 @@ fun EventsScreen() {
                 
                 Spacer(Modifier.height(12.dp))
                 
-                // Filter Chips
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     items(categories) { category ->
                         FilterChip(
@@ -120,7 +116,6 @@ fun EventsScreen() {
                 }
             }
 
-            // List
             if (filteredEvents.isEmpty()) {
                 Box(Modifier.fillMaxSize(), Alignment.Center) {
                     Text("No events found", color = TextSecondary)
@@ -229,13 +224,69 @@ fun EventDetailItem(icon: ImageVector, text: String) {
 @Composable
 fun EventDetailsPopup(event: EventItem, onDismiss: () -> Unit) {
     Dialog(onDismissRequest = onDismiss) {
-        Card(shape = RoundedCornerShape(24.dp), colors = CardDefaults.cardColors(AppSurface)) {
-            Column(Modifier.padding(24.dp)) {
-                Text(event.title, fontSize = 22.sp, fontWeight = FontWeight.Bold)
-                Spacer(Modifier.height(8.dp))
-                Text(event.description)
-                Spacer(Modifier.height(16.dp))
-                Button(onClick = onDismiss, Modifier.fillMaxWidth()) { Text("Close") }
+        Card(
+            shape = RoundedCornerShape(28.dp),
+            colors = CardDefaults.cardColors(containerColor = AppSurface)
+        ) {
+            Column(
+                modifier = Modifier
+                    .verticalScroll(rememberScrollState())
+                    .padding(24.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(text = "Event Details", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                    IconButton(onClick = onDismiss) {
+                        Icon(Icons.Default.Close, contentDescription = "Close", tint = TextSecondary)
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(text = event.title, fontSize = 24.sp, fontWeight = FontWeight.ExtraBold, color = TextPrimary)
+                Spacer(modifier = Modifier.height(8.dp))
+                CategoryTag(event.category)
+                
+                Spacer(modifier = Modifier.height(20.dp))
+                Text(text = "Description", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = TextPrimary)
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(text = event.description, fontSize = 15.sp, color = TextSecondary, lineHeight = 22.sp)
+                
+                Spacer(modifier = Modifier.height(24.dp))
+                HorizontalDivider(color = AppBorder)
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                DetailRow(Icons.Default.DateRange, "Date & Time", event.dateTime)
+                DetailRow(Icons.Default.Place, "Venue", event.venue)
+                
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                val progress = event.currentParticipants.toFloat() / event.maxParticipants.toFloat()
+                Column {
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text("Capacity", fontSize = 12.sp, color = TextSecondary)
+                        Text("${event.currentParticipants}/${event.maxParticipants} joined", fontSize = 12.sp, color = AppTeal, fontWeight = FontWeight.Bold)
+                    }
+                    Spacer(modifier = Modifier.height(6.dp))
+                    LinearProgressIndicator(
+                        progress = { progress },
+                        modifier = Modifier.fillMaxWidth().height(8.dp).clip(CircleShape),
+                        color = if (progress > 0.9f) Color.Red else AppTeal,
+                        trackColor = AppBorder,
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(32.dp))
+                Button(
+                    onClick = onDismiss,
+                    modifier = Modifier.fillMaxWidth().height(50.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = AppTeal)
+                ) {
+                    Text("Join Event", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                }
             }
         }
     }
@@ -243,12 +294,12 @@ fun EventDetailsPopup(event: EventItem, onDismiss: () -> Unit) {
 
 @Composable
 fun DetailRow(icon: ImageVector, label: String, value: String) {
-    Row(Modifier.padding(vertical = 4.dp)) {
+    Row(Modifier.padding(vertical = 8.dp), verticalAlignment = Alignment.Top) {
         Icon(icon, null, Modifier.size(20.dp), tint = AppTeal)
-        Spacer(Modifier.width(12.dp))
+        Spacer(Modifier.width(16.dp))
         Column {
             Text(label, fontSize = 12.sp, color = TextSecondary)
-            Text(value, fontWeight = FontWeight.Bold)
+            Text(value, fontWeight = FontWeight.Bold, color = TextPrimary, fontSize = 15.sp)
         }
     }
 }
