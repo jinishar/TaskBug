@@ -22,12 +22,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-private val AppTeal = Color(0xFF0F766E)
-private val AppBackground = Color(0xFFF9FAFB)
+private val AppTeal = Color(0xFFC1603A)
+private val AppBackground = Color(0xFFFAF6F1)
 private val AppSurface = Color.White
-private val TextPrimary = Color(0xFF111827)
-private val TextSecondary = Color(0xFF6B7280)
-private val AppBorder = Color(0xFFE5E7EB)
+private val TextPrimary = Color(0xFF1E1712)
+private val TextSecondary = Color(0xFFA08878)
+private val AppBorder = Color(0xFFEAE0D8)
 
 data class ChatThread(
     val id: Int,
@@ -47,7 +47,7 @@ data class Message(
 )
 
 val mockThreads = listOf(
-    ChatThread(1, "Arjun S.", "Help me move a sofa", "Sounds good! I'll be there at 5.", "2m ago", 2, Color(0xFF0F766E)),
+    ChatThread(1, "Arjun S.", "Help me move a sofa", "Sounds good! I'll be there at 5.", "2m ago", 2, Color(0xFFC1603A)),
     ChatThread(2, "Priya M.", "Grocery run from Dmart", "Can you share the list?", "15m ago", 0, Color(0xFF7C3AED)),
     ChatThread(3, "Ramesh K.", "Tutor for Math – 10th grade", "What topics does your son need?", "1h ago", 1, Color(0xFFD97706)),
     ChatThread(4, "Sneha P.", "Fix leaky kitchen tap", "I've fixed it! Please confirm.", "3h ago", 0, Color(0xFFDC2626)),

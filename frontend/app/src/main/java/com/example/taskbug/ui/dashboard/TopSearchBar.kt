@@ -3,61 +3,69 @@ package com.example.taskbug.ui.dashboard
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.NavController
+import androidx.navigation.compose.currentBackStackEntryAsState
+
+private val Terra   = Color(0xFFC1603A)
+private val Cream   = Color(0xFFFAF6F1)
+private val Border  = Color(0xFFEAE0D8)
+private val Ink     = Color(0xFF1E1712)
+private val Muted   = Color(0xFFA08878)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TopSearchBar(navController: NavController) {
     var query by remember { mutableStateOf("") }
     var showFilterSheet by remember { mutableStateOf(false) }
-    
+
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
     val isTaskFilter = currentRoute == "tasks"
 
-    CenterAlignedTopAppBar(
-        title = {
-            Row(
+    Surface(color = Color.White, shadowElevation = 2.dp) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 10.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            OutlinedTextField(
+                value = query,
+                onValueChange = { query = it },
+                placeholder = { Text("Search tasks, events…", color = Muted) },
+                singleLine = true,
+                shape = RoundedCornerShape(14.dp),
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 4.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                // 🔍 SEARCH FIELD (80%)
-                OutlinedTextField(
-                    value = query,
-                    onValueChange = { query = it },
-                    placeholder = { Text("Search tasks, events…") },
-                    singleLine = true,
-                    shape = RoundedCornerShape(16.dp),
-                    modifier = Modifier
-                        .weight(0.8f)
-                        .height(52.dp)
+                    .weight(1f)
+                    .height(50.dp),
+                leadingIcon = { Icon(Icons.Default.Search, null, tint = Muted) },
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = Terra,
+                    unfocusedBorderColor = Border,
+                    focusedContainerColor = Color.White,
+                    unfocusedContainerColor = Cream,
+                    cursorColor = Terra
                 )
-
-                // 🎛 FILTER ICON (20%)
-                OutlinedButton(
-                    onClick = { showFilterSheet = true },
-                    shape = RoundedCornerShape(16.dp),
-                    contentPadding = PaddingValues(0.dp),
-                    modifier = Modifier
-                        .weight(0.2f)
-                        .height(52.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Tune,
-                        contentDescription = "Filter"
-                    )
-                }
+            )
+            OutlinedButton(
+                onClick = { showFilterSheet = true },
+                shape = RoundedCornerShape(14.dp),
+                contentPadding = PaddingValues(0.dp),
+                modifier = Modifier.size(50.dp),
+                border = androidx.compose.foundation.BorderStroke(1.5.dp, Border),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = Terra, containerColor = Cream)
+            ) {
+                Icon(Icons.Default.Tune, contentDescription = "Filter", tint = Terra)
             }
         }
-    )
+    }
 
     if (showFilterSheet) {
         FilterBottomSheet(

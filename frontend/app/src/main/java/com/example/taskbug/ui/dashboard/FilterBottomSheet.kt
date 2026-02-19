@@ -18,7 +18,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlin.math.roundToInt
 
-private val AppTeal = Color(0xFF0F766E)
+private val AppTeal = Color(0xFFC1603A)
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -61,11 +61,11 @@ fun FilterBottomSheet(
 
             // CATEGORY SECTION (Renamed/Updated based on domain)
             FilterSection(title = "Category", icon = Icons.Default.Category) {
-                val categories = if (isTaskFilter) 
+                val categories = if (isTaskFilter)
                     listOf("Shopping", "Home", "Pets", "Delivery", "Others")
-                else 
+                else
                     listOf("Tech", "Volunteer", "Networking", "Social", "Others")
-                
+
                 FlowRow(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -220,6 +220,6 @@ fun FilterSection(
         Spacer(modifier = Modifier.height(12.dp))
         content()
         Spacer(modifier = Modifier.height(8.dp))
-        HorizontalDivider(color = Color(0xFFF3F4F6))
+        HorizontalDivider(color = Color(0xFFEDE5DB))
     }
 }

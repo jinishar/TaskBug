@@ -1,8 +1,6 @@
 package com.example.taskbug.navigation
 
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.*
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
@@ -14,6 +12,20 @@ import com.example.taskbug.ui.dashboard.DashboardRoot
 fun AppNavGraph(authViewModel: AuthViewModel) {
     val navController = rememberNavController()
     val userLoggedIn by authViewModel.userLoggedIn.collectAsState()
+
+    // React to login/logout state changes and navigate accordingly
+    LaunchedEffect(userLoggedIn) {
+        if (userLoggedIn) {
+            navController.navigate("dashboard_root") {
+                popUpTo("login") { inclusive = true }
+            }
+        } else {
+            navController.navigate("login") {
+                popUpTo("dashboard_root") { inclusive = true }
+            }
+        }
+    }
+
     val isLoading by authViewModel.isLoading.collectAsState()
     val authError by authViewModel.authError.collectAsState()
 
@@ -32,22 +44,10 @@ fun AppNavGraph(authViewModel: AuthViewModel) {
                 authError = authError,
                 isLoading = isLoading
             )
-            // Navigate on login
-            if (userLoggedIn) {
-                navController.navigate("dashboard_root") {
-                    popUpTo("login") { inclusive = true }
-                }
-            }
         }
 
         composable("dashboard_root") {
             DashboardRoot(authViewModel = authViewModel)
-            // Navigate to login on sign out
-            if (!userLoggedIn) {
-                navController.navigate("login") {
-                    popUpTo("dashboard_root") { inclusive = true }
-                }
-            }
         }
     }
 }

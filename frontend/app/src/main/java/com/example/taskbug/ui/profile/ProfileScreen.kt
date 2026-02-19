@@ -26,12 +26,12 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.example.taskbug.ui.auth.AuthViewModel
 
-private val AppTeal = Color(0xFF0F766E)
-private val AppBackground = Color(0xFFF9FAFB)
+private val AppTeal = Color(0xFFC1603A)
+private val AppBackground = Color(0xFFFAF6F1)
 private val AppSurface = Color.White
-private val TextPrimary = Color(0xFF111827)
-private val TextSecondary = Color(0xFF6B7280)
-private val AppBorder = Color(0xFFE5E7EB)
+private val TextPrimary = Color(0xFF1E1712)
+private val TextSecondary = Color(0xFFA08878)
+private val AppBorder = Color(0xFFEAE0D8)
 
 @Composable
 fun ProfileScreen(authViewModel: AuthViewModel) {
