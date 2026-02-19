@@ -45,13 +45,25 @@ fun ProfileScreen(authViewModel: AuthViewModel) {
     var selectedAvatar by remember { mutableStateOf(bugAvatars.first()) }
     var showAvatarDialog by remember { mutableStateOf(false) }
     
-    // Mock Data
-    val myTasks = remember { mutableStateListOf(Task("Fix Leaking Tap", "Kitchen tap is dripping constantly.", "Today, 5:00 PM", "Home", "Maintenance", "₹500"))}
-    val myEvents = remember { mutableStateListOf(EventItem("Code Sprint", "Collaborative coding session.", "Oct 30, 2:00 PM", "Tech Park", "Technology", 10, 20))}
-    val completedTasks = listOf(Task("Paint Fence", "Garden fence needs a fresh coat.", "Oct 15", "Home", "Maintenance", "₹1000"))
-    val pastEvents = listOf(EventItem("Yoga Morning", "Relaxing yoga session in the park.", "Oct 10", "Central Park", "Health", 25, 30))
+    // Mock Data using mutableStateList for live UI updates
+    val myTasks = remember { mutableStateListOf(
+        Task("Fix Leaking Tap", "Kitchen tap is dripping constantly.", "Today, 5:00 PM", "Home", "Maintenance", "₹500"),
+        Task("Deliver Package", "Small parcel to be delivered to downtown.", "Tomorrow, 10:00 AM", "Office", "Delivery", "₹300")
+    )}
+    
+    val myEvents = remember { mutableStateListOf(
+        EventItem("Code Sprint", "Collaborative coding session.", "Oct 30, 2:00 PM", "Tech Park", "Technology", null, 10, 20)
+    )}
 
-    var activeTab by remember { mutableIntStateOf(0) }
+    val completedTasks = listOf(
+        Task("Paint Fence", "Garden fence needs a fresh coat.", "Oct 15", "Home", "Maintenance", "₹1000")
+    )
+
+    val pastEvents = listOf(
+        EventItem("Yoga Morning", "Relaxing yoga session in the park.", "Oct 10", "Central Park", "Health", null, 25, 30)
+    )
+
+    var activeTab by remember { mutableIntStateOf(0) } // 0: My Tasks, 1: My Events
 
     if (showAvatarDialog) {
         AvatarSelectionDialog(
@@ -63,7 +75,9 @@ fun ProfileScreen(authViewModel: AuthViewModel) {
         )
     }
 
-    Scaffold(containerColor = AppBackground) { padding ->
+    Scaffold(
+        containerColor = AppBackground
+    ) { padding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -73,25 +87,28 @@ fun ProfileScreen(authViewModel: AuthViewModel) {
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(24.dp)
         ) {
+            // --- PROFILE HEADER SECTION (Centered) ---
             ProfileHeader(
                 avatar = selectedAvatar,
                 onAvatarClick = { showAvatarDialog = true }
             )
 
+            // --- STATS ROW ---
             StatsRow(
                 posted = myTasks.size + myEvents.size,
                 completed = completedTasks.size,
                 events = myEvents.size + pastEvents.size
             )
 
-            // --- MY ACTIVE POSTS ---
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            // --- SECTION 1: MY ACTIVE POSTS (OWNERSHIP AREA) ---
+            Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 SectionHeader("My Active Posts")
                 TabRow(
                     selectedTabIndex = activeTab,
                     containerColor = Color.Transparent,
                     contentColor = TaskBugTeal,
-                    indicator = { TabRowDefaults.SecondaryIndicator(Modifier.tabIndicatorOffset(it[activeTab]), color = TaskBugTeal) }
+                    indicator = { TabRowDefaults.SecondaryIndicator(Modifier.tabIndicatorOffset(it[activeTab]), color = TaskBugTeal) },
+                    divider = {}
                 ) {
                     Tab(selected = activeTab == 0, onClick = { activeTab = 0 }) {
                         Text("My Tasks", modifier = Modifier.padding(vertical = 12.dp), fontWeight = if(activeTab == 0) FontWeight.Bold else FontWeight.Normal)
@@ -103,26 +120,55 @@ fun ProfileScreen(authViewModel: AuthViewModel) {
 
                 if (activeTab == 0) {
                     if (myTasks.isEmpty()) EmptyState("You haven't posted any tasks yet")
-                    else myTasks.forEach { task -> EditableTaskCard(task, onDelete = { myTasks.remove(task) }, onUpdate = { updated -> myTasks[myTasks.indexOf(task)] = updated }) }
+                    else myTasks.forEach { task -> 
+                        EditableTaskCard(
+                            task = task, 
+                            onDelete = { myTasks.remove(task) },
+                            onUpdate = { updatedTask -> 
+                                val index = myTasks.indexOf(task)
+                                if (index != -1) myTasks[index] = updatedTask
+                            }
+                        ) 
+                    }
                 } else {
                     if (myEvents.isEmpty()) EmptyState("You haven't posted any events yet")
-                    else myEvents.forEach { event -> EditableEventCard(event, onDelete = { myEvents.remove(event) }, onUpdate = { updated -> myEvents[myEvents.indexOf(event)] = updated }) }
+                    else myEvents.forEach { event -> 
+                        EditableEventCard(
+                            event = event, 
+                            onDelete = { myEvents.remove(event) },
+                            onUpdate = { updatedEvent ->
+                                val index = myEvents.indexOf(event)
+                                if (index != -1) myEvents[index] = updatedEvent
+                            }
+                        ) 
+                    }
                 }
             }
-            
-            SectionHeader("Completed Tasks")
-            if (completedTasks.isEmpty()) EmptyState("No completed tasks yet")
-            else completedTasks.forEach { CompletedTaskCard(it) }
 
-            SectionHeader("Past Events")
-            if (pastEvents.isEmpty()) EmptyState("No past events yet")
-            else pastEvents.forEach { PastEventCard(it) }
-            
-            // --- SETTINGS & NAVIGATION ---
-            Column(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(AppSurface)) {
+            // --- SECTION 2: COMPLETED TASKS ---
+            Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                SectionHeader("Completed Tasks")
+                if (completedTasks.isEmpty()) EmptyState("No completed tasks yet")
+                else completedTasks.forEach { CompletedTaskCard(it) }
+            }
+
+            // --- SECTION 3: PAST EVENTS ---
+            Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                SectionHeader("Past Events")
+                if (pastEvents.isEmpty()) EmptyState("No past events yet")
+                else pastEvents.forEach { PastEventCard(it) }
+            }
+
+            // --- SECTION 5: SETTINGS & NAVIGATION ---
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(AppSurface)
+            ) {
                 MenuListItem(icon = Icons.Default.Settings, title = "Settings")
                 HorizontalDivider(color = AppBorder)
-                MenuListItem(icon = Icons.Default.Info, title = "Help & Support")
+                MenuListItem(icon = Icons.AutoMirrored.Filled.Help, title = "Help & Support")
                 HorizontalDivider(color = AppBorder)
                 MenuListItem(icon = Icons.Default.Lock, title = "Privacy Policy")
             }
@@ -146,7 +192,10 @@ fun ProfileScreen(authViewModel: AuthViewModel) {
 
 @Composable
 fun ProfileHeader(avatar: BugAvatar, onAvatarClick: () -> Unit) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
         Box(
             modifier = Modifier
                 .size(100.dp)
@@ -157,21 +206,28 @@ fun ProfileHeader(avatar: BugAvatar, onAvatarClick: () -> Unit) {
         ) {
             Icon(avatar.image, null, tint = avatar.backgroundColor, modifier = Modifier.size(60.dp))
             Box(
-                Modifier.align(Alignment.BottomEnd).offset(x = (-4).dp, y = (-4).dp).background(TaskBugTeal, CircleShape).padding(6.dp)
+                Modifier
+                    .align(Alignment.BottomEnd)
+                    .offset(x = (-4).dp, y = (-4).dp)
+                    .background(TaskBugTeal, CircleShape)
+                    .padding(6.dp)
             ) {
-                Icon(Icons.Default.PhotoCamera, null, tint = Color.White, modifier = Modifier.size(14.dp))
+                Icon(Icons.Default.CameraAlt, null, tint = Color.White, modifier = Modifier.size(14.dp))
             }
         }
         Spacer(Modifier.height(16.dp))
-        Text("John Doe", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
-        Text("john.doe@taskbug.com", color = TextSecondary)
-        Text("+91 98765 43210", color = TextSecondary)
+        Text("John Doe", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = TextPrimary, textAlign = TextAlign.Center)
+        Text("john.doe@taskbug.com", color = TextSecondary, textAlign = TextAlign.Center)
+        Text("+91 98765 43210", color = TextSecondary, textAlign = TextAlign.Center)
         Text("123, Innovation Way, Tech City", color = TextSecondary, textAlign = TextAlign.Center)
         Spacer(Modifier.height(20.dp))
-        OutlinedButton(onClick = { /* Edit Profile */ }, shape = RoundedCornerShape(12.dp)) {
-            Icon(Icons.Default.Edit, null, modifier = Modifier.size(18.dp))
+        OutlinedButton(
+            onClick = { /* Edit Profile Flow */ },
+            shape = RoundedCornerShape(12.dp)
+        ) {
+            Icon(Icons.Default.Edit, null, modifier = Modifier.size(18.dp), tint = Color(0xFF4F46E5))
             Spacer(Modifier.width(8.dp))
-            Text("Edit Profile")
+            Text("Edit Profile", color = Color(0xFF4F46E5))
         }
     }
 }
@@ -187,12 +243,27 @@ fun EditableTaskCard(task: Task, onDelete: () -> Unit, onUpdate: (Task) -> Unit)
             onDismissRequest = { showDeleteDialog = false },
             title = { Text("Delete Task") },
             text = { Text("Are you sure you want to delete this task?") },
-            confirmButton = { TextButton(onClick = { onDelete(); showDeleteDialog = false }) { Text("Delete", color = Color.Red) } },
-            dismissButton = { TextButton(onClick = { showDeleteDialog = false }) { Text("Cancel") } }
+            confirmButton = {
+                TextButton(onClick = { 
+                    onDelete()
+                    showDeleteDialog = false
+                }) { Text("Delete", color = Color.Red) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteDialog = false }) { Text("Cancel") }
+            }
         )
     }
+
     if (showEditDialog) {
-        AddTaskDialog(initialTask = task, onDismiss = { showEditDialog = false }, onPost = { onUpdate(it); showEditDialog = false })
+        AddTaskDialog(
+            initialTask = task, 
+            onDismiss = { showEditDialog = false }, 
+            onPost = { 
+                onUpdate(it)
+                showEditDialog = false 
+            }
+        )
     }
 
     Card(
@@ -210,8 +281,8 @@ fun EditableTaskCard(task: Task, onDelete: () -> Unit, onUpdate: (Task) -> Unit)
                 Box {
                     IconButton(onClick = { showMenu = true }) { Icon(Icons.Default.MoreVert, null) }
                     DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
-                        DropdownMenuItem(text = { Text("✏️ Edit") }, onClick = { showMenu = false; showEditDialog = true })
-                        DropdownMenuItem(text = { Text("🗑 Delete") }, onClick = { showMenu = false; showDeleteDialog = true })
+                        DropdownMenuItem(text = { Text("Edit") }, onClick = { showMenu = false; showEditDialog = true })
+                        DropdownMenuItem(text = { Text("Delete") }, onClick = { showMenu = false; showDeleteDialog = true })
                     }
                 }
             }
@@ -240,12 +311,27 @@ fun EditableEventCard(event: EventItem, onDelete: () -> Unit, onUpdate: (EventIt
             onDismissRequest = { showDeleteDialog = false },
             title = { Text("Delete Event") },
             text = { Text("Are you sure you want to delete this event?") },
-            confirmButton = { TextButton(onClick = { onDelete(); showDeleteDialog = false }) { Text("Delete", color = Color.Red) } },
-            dismissButton = { TextButton(onClick = { showDeleteDialog = false }) { Text("Cancel") } }
+            confirmButton = {
+                TextButton(onClick = { 
+                    onDelete()
+                    showDeleteDialog = false
+                }) { Text("Delete", color = Color.Red) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteDialog = false }) { Text("Cancel") }
+            }
         )
     }
+
     if (showEditDialog) {
-        AddEventDialog(initialEvent = event, onDismiss = { showEditDialog = false }, onPost = { onUpdate(it); showEditDialog = false })
+        AddEventDialog(
+            initialEvent = event, 
+            onDismiss = { showEditDialog = false }, 
+            onPost = { 
+                onUpdate(it)
+                showEditDialog = false 
+            }
+        )
     }
 
     Card(
@@ -263,8 +349,8 @@ fun EditableEventCard(event: EventItem, onDelete: () -> Unit, onUpdate: (EventIt
                 Box {
                     IconButton(onClick = { showMenu = true }) { Icon(Icons.Default.MoreVert, null) }
                     DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
-                        DropdownMenuItem(text = { Text(" Edit") }, onClick = { showMenu = false; showEditDialog = true })
-                        DropdownMenuItem(text = { Text(" Delete") }, onClick = { showMenu = false; showDeleteDialog = true })
+                        DropdownMenuItem(text = { Text("Edit") }, onClick = { showMenu = false; showEditDialog = true })
+                        DropdownMenuItem(text = { Text("Delete") }, onClick = { showMenu = false; showDeleteDialog = true })
                     }
                 }
             }
@@ -301,7 +387,7 @@ fun StatItem(label: String, value: String) {
 
 @Composable
 fun SectionHeader(title: String) {
-    Text(title, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = TextPrimary, modifier = Modifier.fillMaxWidth())
+    Text(title, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = TextPrimary, modifier = Modifier.fillMaxWidth().padding(top = 16.dp))
 }
 
 @Composable

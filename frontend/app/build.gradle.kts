@@ -64,4 +64,7 @@ dependencies {
     implementation(platform("com.google.firebase:firebase-bom:32.7.2"))
     implementation("com.google.firebase:firebase-auth")
     implementation("com.google.firebase:firebase-firestore")
+
+    // Added Coil for poster uploading/display
+    implementation("io.coil-kt:coil-compose:2.6.0")
 }
