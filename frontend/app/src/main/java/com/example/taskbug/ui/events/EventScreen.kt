@@ -33,12 +33,12 @@ import androidx.compose.ui.window.Dialog
 import coil.compose.SubcomposeAsyncImage
 
 /* ---------- DESIGN SYSTEM ---------- */
-private val AppTeal = Color(0xFF0F766E)
-private val AppBackground = Color(0xFFF9FAFB)
+private val AppTeal = Color(0xFFC1603A)
+private val AppBackground = Color(0xFFFAF6F1)
 private val AppSurface = Color.White
-private val TextPrimary = Color(0xFF111827)
-private val TextSecondary = Color(0xFF6B7280)
-private val AppBorder = Color(0xFFE5E7EB)
+private val TextPrimary = Color(0xFF1E1712)
+private val TextSecondary = Color(0xFFA08878)
+private val AppBorder = Color(0xFFEAE0D8)
 
 data class EventItem(
     val title: String,
@@ -60,7 +60,7 @@ fun EventsScreen() {
     var selectedCategory by remember { mutableStateOf("All") }
 
     val categories = listOf("All", "Technology", "Volunteer", "Networking", "Social", "Work")
-    
+
     val eventsList = remember {
         mutableStateListOf(
             EventItem("Tech Workshop 2024", "Join us for a deep dive into modern Android development.", "Oct 25, 10:00 AM", "Innovation Hub, NY", "Technology", null, 42, 50),
@@ -71,8 +71,8 @@ fun EventsScreen() {
 
     val filteredEvents = remember(searchQuery, selectedCategory, eventsList.size) {
         eventsList.filter { event ->
-            val matchesSearch = event.title.contains(searchQuery, ignoreCase = true) || 
-                              event.description.contains(searchQuery, ignoreCase = true)
+            val matchesSearch = event.title.contains(searchQuery, ignoreCase = true) ||
+                    event.description.contains(searchQuery, ignoreCase = true)
             val matchesCategory = selectedCategory == "All" || event.category == selectedCategory
             matchesSearch && matchesCategory
         }
@@ -95,7 +95,7 @@ fun EventsScreen() {
             Column(modifier = Modifier.padding(16.dp)) {
                 Text("Upcoming Events", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
                 Spacer(Modifier.height(12.dp))
-                
+
                 OutlinedTextField(
                     value = searchQuery,
                     onValueChange = { searchQuery = it },
@@ -110,9 +110,9 @@ fun EventsScreen() {
                     shape = RoundedCornerShape(12.dp),
                     colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = AppTeal, unfocusedBorderColor = AppBorder)
                 )
-                
+
                 Spacer(Modifier.height(12.dp))
-                
+
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     items(categories) { category ->
                         FilterChip(
@@ -199,7 +199,7 @@ fun EventCard(event: EventItem, onClick: () -> Unit) {
 @Composable
 fun AddEventDialog(
     initialEvent: EventItem? = null,
-    onDismiss: () -> Unit, 
+    onDismiss: () -> Unit,
     onPost: (EventItem) -> Unit
 ) {
     var title by remember { mutableStateOf(initialEvent?.title ?: "") }
@@ -214,10 +214,10 @@ fun AddEventDialog(
     ) { uri: Uri? ->
         imageUri = uri
     }
-    
+
     val initialDate = initialEvent?.dateTime?.split(", ")?.getOrNull(0) ?: ""
     val initialTime = initialEvent?.dateTime?.split(", ")?.getOrNull(1) ?: ""
-    
+
     var date by remember { mutableStateOf(initialDate) }
     var time by remember { mutableStateOf(initialTime) }
 
@@ -237,8 +237,8 @@ fun AddEventDialog(
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 Text(
-                    text = if (initialEvent == null) "Create New Event" else "Edit Event", 
-                    fontSize = 22.sp, 
+                    text = if (initialEvent == null) "Create New Event" else "Edit Event",
+                    fontSize = 22.sp,
                     fontWeight = FontWeight.Bold,
                     color = AppTeal
                 )
@@ -310,10 +310,10 @@ fun AddEventDialog(
                     onClick = {
                         if (title.isNotBlank() && description.isNotBlank() && venue.isNotBlank()) {
                             onPost(EventItem(
-                                title = title, 
-                                description = description, 
-                                dateTime = if(time.isNotBlank()) "$date, $time" else date, 
-                                venue = venue, 
+                                title = title,
+                                description = description,
+                                dateTime = if(time.isNotBlank()) "$date, $time" else date,
+                                venue = venue,
                                 category = category,
                                 imageUri = imageUri?.toString(),
                                 currentParticipants = initialEvent?.currentParticipants ?: 0,
@@ -390,21 +390,21 @@ fun EventDetailsPopup(event: EventItem, onDismiss: () -> Unit) {
                     Text(text = event.title, fontSize = 24.sp, fontWeight = FontWeight.ExtraBold, color = TextPrimary)
                     Spacer(modifier = Modifier.height(8.dp))
                     CategoryTag(event.category)
-                    
+
                     Spacer(modifier = Modifier.height(20.dp))
                     Text(text = "Description", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = TextPrimary)
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(text = event.description, fontSize = 15.sp, color = TextSecondary, lineHeight = 22.sp)
-                    
+
                     Spacer(modifier = Modifier.height(24.dp))
                     HorizontalDivider(color = AppBorder)
                     Spacer(modifier = Modifier.height(16.dp))
-                    
+
                     DetailRow(Icons.Default.DateRange, "Date & Time", event.dateTime)
                     DetailRow(Icons.Default.Place, "Venue", event.venue)
-                    
+
                     Spacer(modifier = Modifier.height(16.dp))
-                    
+
                     val progress = event.currentParticipants.toFloat() / event.maxParticipants.toFloat()
                     Column {
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
