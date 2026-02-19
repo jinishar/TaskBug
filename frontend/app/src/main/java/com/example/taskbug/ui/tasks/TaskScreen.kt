@@ -7,10 +7,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -19,68 +17,71 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 
-/* ---------- DESIGN SYSTEM REFINED ---------- */
+/* ---------- DESIGN TOKENS ---------- */
 private val AppTeal = Color(0xFF0F766E)
 private val AppBackground = Color(0xFFF9FAFB)
 private val AppSurface = Color.White
-private val TextPrimary = Color(0xFF1F2937)
+private val TextPrimary = Color(0xFF111827)
 private val TextSecondary = Color(0xFF6B7280)
 private val AppBorder = Color(0xFFE5E7EB)
+private val StatusPosted = Color(0xFF2563EB)
+private val StatusAccepted = Color(0xFFD97706)
+private val StatusCompleted = Color(0xFF16A34A)
 
-data class Task(
+/* ---------- DATA ---------- */
+data class TaskItem(
+    val id: Int,
     val title: String,
     val description: String,
-    val deadline: String,
-    val location: String,
     val category: String,
-    val reward: String
+    val budget: Int,
+    val location: String,
+    val deadline: String,
+    val posterName: String,
+    val posterAvatar: String,
+    val status: String = "Posted",   // Posted | Accepted | In Progress | Completed
+    val distance: String = "0.5 km"
 )
 
+val sampleTasks = listOf(
+    TaskItem(1, "Help me move a sofa", "Need 2 people to move a 3-seat sofa from ground floor to 2nd floor. Shouldn't take more than 30 min.", "Home", 300, "Koramangala, Bengaluru", "Today, 5 PM", "Arjun S.", "", "Posted", "1.2 km"),
+    TaskItem(2, "Grocery run from Dmart", "Pick up ~10 items from Dmart HSR and drop at my apartment. Parking available.", "Errands", 150, "HSR Layout, Bengaluru", "Today, 2 PM", "Priya M.", "", "Posted", "0.8 km"),
+    TaskItem(3, "Tutor for Math – 10th grade", "Need a tutor for 2 hours to help my son with algebra and geometry. Prefer someone with prior experience.", "Academic", 500, "BTM Layout, Bengaluru", "Tomorrow, 10 AM", "Ramesh K.", "", "Accepted", "2.3 km"),
+    TaskItem(4, "Fix leaky kitchen tap", "Small repair job. Tools available at home. Should be a 20–30 min task.", "Home", 200, "Indiranagar, Bengaluru", "This week", "Sneha P.", "", "In Progress", "3.1 km"),
+    TaskItem(5, "Deliver documents to Whitefield", "Office documents to be dropped at a law firm in Whitefield. Envelope is sealed.", "Delivery", 250, "MG Road, Bengaluru", "Urgent", "Vikram N.", "", "Posted", "4.5 km"),
+    TaskItem(6, "Dog walking – 45 min", "Walk my golden retriever Biscuit around the park. He's friendly and leash-trained.", "Pets", 100, "Jayanagar, Bengaluru", "Daily 7 AM", "Ananya T.", "", "Completed", "1.9 km"),
+)
+
+/* ---------- SCREEN ---------- */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TasksScreen() {
-    var showAddTaskDialog by remember { mutableStateOf(false) }
-    var selectedTask by remember { mutableStateOf<Task?>(null) }
-    var searchQuery by remember { mutableStateOf("") }
+    var selectedTask by remember { mutableStateOf<TaskItem?>(null) }
+    var showAddTask by remember { mutableStateOf(false) }
     var selectedCategory by remember { mutableStateOf("All") }
 
-    val categories = listOf("All", "Shopping", "Home", "Pets", "Technical")
-    
-    val tasksList = remember {
-        mutableStateListOf(
-            Task("Groceries Delivery", "Need someone to pick up groceries from the local store.", "Oct 25, 5:00 PM", "Brooklyn, NY", "Shopping", "₹1,200"),
-            Task("Furniture Assembly", "Help needed to assemble a new IKEA desk.", "Oct 26, 10:00 AM", "Queens, NY", "Home", "₹2,500"),
-            Task("Dog Walking", "Walk my friendly golden retriever for 30 minutes.", "Oct 26, 4:00 PM", "Central Park", "Pets", "₹800")
-        )
-    }
+    val taskList = remember { sampleTasks.toMutableStateList() }
+    val categories = listOf("All", "Home", "Errands", "Academic", "Delivery", "Pets", "Others")
 
-    val filteredTasks = remember(searchQuery, selectedCategory, tasksList.size) {
-        tasksList.filter { task ->
-            val matchesSearch = task.title.contains(searchQuery, ignoreCase = true) || 
-                              task.description.contains(searchQuery, ignoreCase = true)
-            val matchesCategory = selectedCategory == "All" || task.category == selectedCategory
-            matchesSearch && matchesCategory
-        }
+    val filtered = remember(selectedCategory, taskList.size) {
+        if (selectedCategory == "All") taskList.toList()
+        else taskList.filter { it.category == selectedCategory }
     }
 
     Scaffold(
         containerColor = AppBackground,
         floatingActionButton = {
             FloatingActionButton(
-                onClick = { showAddTaskDialog = true },
+                onClick = { showAddTask = true },
                 containerColor = AppTeal,
                 contentColor = Color.White,
-                shape = CircleShape,
-                elevation = FloatingActionButtonDefaults.elevation(8.dp)
-            ) {
-                Icon(Icons.Default.Add, contentDescription = "Add Task")
-            }
+                shape = CircleShape
+            ) { Icon(Icons.Default.Add, contentDescription = "Post Task") }
         }
     ) { padding ->
         Column(
@@ -88,106 +89,73 @@ fun TasksScreen() {
                 .fillMaxSize()
                 .padding(padding)
         ) {
-            // Header with Search and Filter
-            Column(modifier = Modifier.padding(16.dp)) {
-                Text(
-                    text = "Active Tasks",
-                    fontSize = 24.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = TextPrimary,
-                    modifier = Modifier.padding(bottom = 12.dp)
-                )
-                
-                OutlinedTextField(
-                    value = searchQuery,
-                    onValueChange = { searchQuery = it },
-                    placeholder = { Text("Search tasks...") },
-                    modifier = Modifier.fillMaxWidth(),
-                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
-                    trailingIcon = {
-                        if (searchQuery.isNotEmpty()) {
-                            IconButton(onClick = { searchQuery = "" }) {
-                                Icon(Icons.Default.Clear, contentDescription = "Clear")
-                            }
-                        }
-                    },
-                    shape = RoundedCornerShape(12.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = AppTeal,
-                        unfocusedBorderColor = AppBorder
-                    ),
-                    singleLine = true
-                )
-                
-                Spacer(modifier = Modifier.height(12.dp))
-                
-                LazyRow(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    items(categories) { category ->
-                        val isSelected = selectedCategory == category
+            // Header
+            Column(modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 8.dp)) {
+                Text("Nearby Tasks", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                Text("Find tasks in your area", fontSize = 14.sp, color = TextSecondary)
+                Spacer(Modifier.height(12.dp))
+                // Category chips
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    items(categories) { cat ->
                         FilterChip(
-                            selected = isSelected,
-                            onClick = { selectedCategory = category },
-                            label = { Text(category) },
+                            selected = selectedCategory == cat,
+                            onClick = { selectedCategory = cat },
+                            label = { Text(cat, fontSize = 13.sp) },
                             colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = AppTeal.copy(alpha = 0.1f),
-                                selectedLabelColor = AppTeal,
-                                labelColor = TextSecondary
-                            ),
-                            border = FilterChipDefaults.filterChipBorder(
-                                enabled = true,
-                                selected = isSelected,
-                                borderColor = AppBorder,
-                                selectedBorderColor = AppTeal,
-                                borderWidth = 1.dp,
-                                selectedBorderWidth = 1.dp
+                                selectedContainerColor = AppTeal.copy(alpha = 0.12f),
+                                selectedLabelColor = AppTeal
                             )
                         )
                     }
                 }
             }
 
-            if (filteredTasks.isEmpty()) {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(Icons.Default.SearchOff, contentDescription = null, modifier = Modifier.size(64.dp), tint = TextSecondary.copy(alpha = 0.5f))
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text("No tasks found", color = TextSecondary)
-                    }
+            if (filtered.isEmpty()) {
+                Box(Modifier.fillMaxSize(), Alignment.Center) {
+                    Text("No tasks in this category", color = TextSecondary)
                 }
             } else {
                 LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 80.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    items(filteredTasks) { task ->
-                        TaskCard(task, onClick = { selectedTask = task })
+                    items(filtered) { task ->
+                        TaskCard(task = task, onClick = { selectedTask = task })
                     }
+                    item { Spacer(Modifier.height(72.dp)) } // FAB clearance
                 }
             }
         }
 
-        if (showAddTaskDialog) {
-            AddTaskDialog(
-                onDismiss = { showAddTaskDialog = false },
-                onPost = { newTask ->
-                    tasksList.add(0, newTask)
-                    showAddTaskDialog = false
-                }
-            )
+        // Task detail dialog
+        selectedTask?.let {
+            TaskDetailDialog(task = it, onDismiss = { selectedTask = null })
         }
 
-        selectedTask?.let {
-            TaskDetailsPopup(task = it, onDismiss = { selectedTask = null })
+        // Add task dialog
+        if (showAddTask) {
+            AddTaskDialog(
+                onDismiss = { showAddTask = false },
+                onPost = { newTask ->
+                    taskList.add(0, newTask)
+                    showAddTask = false
+                }
+            )
         }
     }
 }
 
+/* ---------- TASK CARD ---------- */
 @Composable
-fun TaskCard(task: Task, onClick: () -> Unit) {
+fun TaskCard(task: TaskItem, onClick: () -> Unit) {
+    val statusColor = when (task.status) {
+        "Posted" -> StatusPosted
+        "Accepted" -> StatusAccepted
+        "In Progress" -> StatusAccepted
+        "Completed" -> StatusCompleted
+        else -> TextSecondary
+    }
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -196,133 +164,193 @@ fun TaskCard(task: Task, onClick: () -> Unit) {
         colors = CardDefaults.cardColors(containerColor = AppSurface),
         border = BorderStroke(1.dp, AppBorder)
     ) {
-        Column {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(140.dp)
-                    .padding(12.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(AppBorder.copy(alpha = 0.5f)),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(Icons.Default.Task, contentDescription = null, modifier = Modifier.size(40.dp), tint = TextSecondary)
-            }
-
-            Column(modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 16.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+        Column(Modifier.padding(16.dp)) {
+            // Top row: category tag + status
+            Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween, Alignment.CenterVertically) {
+                Surface(
+                    color = AppTeal.copy(alpha = 0.1f),
+                    shape = RoundedCornerShape(8.dp)
                 ) {
                     Text(
-                        text = task.title,
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = TextPrimary
-                    )
-                    Text(
-                        text = task.reward,
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = AppTeal
+                        task.category,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                        color = AppTeal,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold
                     )
                 }
+                Surface(
+                    color = statusColor.copy(alpha = 0.1f),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text(
+                        task.status,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                        color = statusColor,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+            }
 
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(text = task.description, fontSize = 14.sp, color = TextSecondary, maxLines = 1)
+            Spacer(Modifier.height(10.dp))
 
-                Spacer(modifier = Modifier.height(12.dp))
-                HorizontalDivider(color = AppBorder)
-                Spacer(modifier = Modifier.height(12.dp))
-                
-                TaskDetailItem(Icons.Default.AccessTime, task.deadline)
-                TaskDetailItem(Icons.Default.Place, task.location)
+            Text(task.title, fontSize = 17.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+            Spacer(Modifier.height(4.dp))
+            Text(task.description, fontSize = 13.sp, color = TextSecondary, maxLines = 2, lineHeight = 18.sp)
+
+            Spacer(Modifier.height(12.dp))
+
+            // Meta info row
+            Row(Modifier.fillMaxWidth(), Arrangement.spacedBy(16.dp)) {
+                MetaChip(Icons.Default.Place, task.distance)
+                MetaChip(Icons.Default.AccessTime, task.deadline)
+                Spacer(Modifier.weight(1f))
+                Text(
+                    "₹${task.budget}",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = AppTeal
+                )
+            }
+
+            HorizontalDivider(modifier = Modifier.padding(vertical = 10.dp), color = AppBorder)
+
+            // Poster info
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier
+                        .size(32.dp)
+                        .clip(CircleShape)
+                        .background(AppTeal.copy(alpha = 0.15f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        task.posterName.take(1),
+                        color = AppTeal,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 14.sp
+                    )
+                }
+                Spacer(Modifier.width(8.dp))
+                Text(task.posterName, fontSize = 13.sp, color = TextSecondary)
+                Spacer(Modifier.weight(1f))
+                Icon(Icons.Default.LocationOn, contentDescription = null, tint = TextSecondary, modifier = Modifier.size(14.dp))
+                Spacer(Modifier.width(2.dp))
+                Text(task.location, fontSize = 12.sp, color = TextSecondary)
             }
         }
     }
 }
 
 @Composable
-fun TaskDetailsPopup(task: Task, onDismiss: () -> Unit) {
+fun MetaChip(icon: androidx.compose.ui.graphics.vector.ImageVector, text: String) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Icon(icon, contentDescription = null, tint = TextSecondary, modifier = Modifier.size(14.dp))
+        Spacer(Modifier.width(4.dp))
+        Text(text, fontSize = 12.sp, color = TextSecondary)
+    }
+}
+
+/* ---------- TASK DETAIL DIALOG ---------- */
+@Composable
+fun TaskDetailDialog(task: TaskItem, onDismiss: () -> Unit) {
+    val statusColor = when (task.status) {
+        "Posted" -> StatusPosted
+        "Accepted" -> StatusAccepted
+        "In Progress" -> StatusAccepted
+        "Completed" -> StatusCompleted
+        else -> TextSecondary
+    }
+
     Dialog(onDismissRequest = onDismiss) {
         Card(
-            shape = RoundedCornerShape(28.dp),
+            shape = RoundedCornerShape(24.dp),
             colors = CardDefaults.cardColors(containerColor = AppSurface)
         ) {
-            Column(
-                modifier = Modifier.verticalScroll(rememberScrollState())
-            ) {
-                // Header with Close Icon
-                Box(modifier = Modifier.fillMaxWidth().padding(start = 16.dp, top = 8.dp, end = 8.dp)) {
-                    Text(
-                        text = "Task Details",
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.align(Alignment.CenterStart),
-                        color = TextPrimary
-                    )
-                    IconButton(
-                        onClick = onDismiss,
-                        modifier = Modifier.align(Alignment.CenterEnd)
-                    ) {
+            Column(Modifier.padding(24.dp)) {
+                // Header
+                Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween, Alignment.CenterVertically) {
+                    Text("Task Details", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                    IconButton(onClick = onDismiss) {
                         Icon(Icons.Default.Close, contentDescription = "Close", tint = TextSecondary)
                     }
                 }
 
-                // Image (90% width approx via padding)
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(180.dp)
-                        .padding(horizontal = 20.dp)
-                        .clip(RoundedCornerShape(20.dp))
-                        .background(AppBorder.copy(alpha = 0.5f)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(Icons.Default.Task, contentDescription = null, modifier = Modifier.size(64.dp), tint = TextSecondary)
+                Spacer(Modifier.height(16.dp))
+
+                Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween, Alignment.CenterVertically) {
+                    Surface(color = AppTeal.copy(alpha = 0.1f), shape = RoundedCornerShape(8.dp)) {
+                        Text(task.category, modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp), color = AppTeal, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                    }
+                    Surface(color = statusColor.copy(alpha = 0.1f), shape = RoundedCornerShape(8.dp)) {
+                        Text(task.status, modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp), color = statusColor, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                    }
                 }
 
-                Column(modifier = Modifier.padding(24.dp)) {
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                        Text(text = task.title, fontSize = 24.sp, fontWeight = FontWeight.ExtraBold, color = TextPrimary, modifier = Modifier.weight(1f))
-                        Text(text = task.reward, fontSize = 22.sp, fontWeight = FontWeight.Bold, color = AppTeal)
+                Spacer(Modifier.height(12.dp))
+                Text(task.title, fontSize = 22.sp, fontWeight = FontWeight.ExtraBold, color = TextPrimary)
+                Spacer(Modifier.height(8.dp))
+                Text(task.description, fontSize = 15.sp, color = TextSecondary, lineHeight = 22.sp)
+
+                Spacer(Modifier.height(20.dp))
+                HorizontalDivider(color = AppBorder)
+                Spacer(Modifier.height(16.dp))
+
+                // Details grid
+                DetailRowTask(Icons.Default.Place, "Location", task.location)
+                DetailRowTask(Icons.Default.AccessTime, "Deadline", task.deadline)
+                DetailRowTask(Icons.Default.NearMe, "Distance", task.distance)
+                DetailRowTask(Icons.Default.Person, "Posted by", task.posterName)
+
+                Spacer(Modifier.height(20.dp))
+
+                // Budget highlight
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(AppTeal.copy(alpha = 0.08f), RoundedCornerShape(12.dp))
+                        .padding(16.dp),
+                    Arrangement.SpaceBetween,
+                    Alignment.CenterVertically
+                ) {
+                    Text("Reward / Budget", fontSize = 14.sp, color = TextSecondary)
+                    Text("₹${task.budget}", fontSize = 26.sp, fontWeight = FontWeight.ExtraBold, color = AppTeal)
+                }
+
+                Spacer(Modifier.height(20.dp))
+
+                // CTA buttons
+                if (task.status == "Posted") {
+                    Button(
+                        onClick = onDismiss,
+                        modifier = Modifier.fillMaxWidth().height(52.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = AppTeal)
+                    ) {
+                        Icon(Icons.Default.CheckCircle, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("Accept Task", fontWeight = FontWeight.Bold, fontSize = 16.sp)
                     }
-                    
-                    Spacer(modifier = Modifier.height(8.dp))
-                    CategoryTag(task.category)
-                    
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text(text = "Description", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = TextPrimary)
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(text = task.description, fontSize = 15.sp, color = TextSecondary, lineHeight = 22.sp)
-                    
-                    Spacer(modifier = Modifier.height(20.dp))
-                    HorizontalDivider(color = AppBorder)
-                    Spacer(modifier = Modifier.height(16.dp))
-                    
-                    DetailRow(Icons.Default.CalendarToday, "Deadline", task.deadline)
-                    DetailRow(Icons.Default.Place, "Location", task.location)
-
-                    Spacer(modifier = Modifier.height(32.dp))
-
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        OutlinedButton(
-                            onClick = { /* Save */ },
-                            modifier = Modifier.weight(1f).height(50.dp),
-                            shape = RoundedCornerShape(12.dp),
-                            border = BorderStroke(1.dp, AppTeal)
-                        ) {
-                            Text("Save", color = AppTeal)
-                        }
-                        Button(
-                            onClick = { /* Apply */ },
-                            modifier = Modifier.weight(1f).height(50.dp),
-                            shape = RoundedCornerShape(12.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = AppTeal)
-                        ) {
-                            Text("Apply Now")
-                        }
+                    Spacer(Modifier.height(8.dp))
+                    OutlinedButton(
+                        onClick = onDismiss,
+                        modifier = Modifier.fillMaxWidth().height(48.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        border = BorderStroke(1.dp, AppTeal)
+                    ) {
+                        Icon(Icons.Default.Chat, contentDescription = null, modifier = Modifier.size(16.dp), tint = AppTeal)
+                        Spacer(Modifier.width(8.dp))
+                        Text("Message Poster", color = AppTeal, fontWeight = FontWeight.Medium)
+                    }
+                } else {
+                    Button(
+                        onClick = onDismiss,
+                        modifier = Modifier.fillMaxWidth().height(52.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = AppTeal)
+                    ) {
+                        Text("Close", fontWeight = FontWeight.Bold, fontSize = 16.sp)
                     }
                 }
             }
@@ -331,142 +359,138 @@ fun TaskDetailsPopup(task: Task, onDismiss: () -> Unit) {
 }
 
 @Composable
-fun DetailRow(icon: ImageVector, label: String, value: String) {
-    Row(modifier = Modifier.padding(vertical = 6.dp), verticalAlignment = Alignment.Top) {
-        Icon(icon, contentDescription = null, modifier = Modifier.size(20.dp), tint = AppTeal)
-        Spacer(modifier = Modifier.width(16.dp))
+fun DetailRowTask(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, value: String) {
+    Row(Modifier.padding(vertical = 6.dp), verticalAlignment = Alignment.Top) {
+        Icon(icon, null, Modifier.size(18.dp), tint = AppTeal)
+        Spacer(Modifier.width(12.dp))
         Column {
-            Text(text = label, fontSize = 12.sp, color = TextSecondary, fontWeight = FontWeight.Medium)
-            Text(text = value, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = TextPrimary)
+            Text(label, fontSize = 11.sp, color = TextSecondary)
+            Text(value, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = TextPrimary)
         }
     }
 }
 
-@Composable
-fun TaskDetailItem(icon: ImageVector, text: String) {
-    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 2.dp)) {
-        Icon(imageVector = icon, contentDescription = null, modifier = Modifier.size(16.dp), tint = AppTeal)
-        Spacer(modifier = Modifier.width(8.dp))
-        Text(text = text, fontSize = 13.sp, color = TextSecondary)
-    }
-}
-
-@Composable
-fun CategoryTag(category: String) {
-    Surface(color = AppTeal.copy(alpha = 0.1f), shape = RoundedCornerShape(8.dp)) {
-        Text(text = category, modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp), fontSize = 11.sp, fontWeight = FontWeight.Bold, color = AppTeal)
-    }
-}
-
+/* ---------- ADD TASK DIALOG ---------- */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AddTaskDialog(initialTask: Task? = null, onDismiss: () -> Unit, onPost: (Task) -> Unit) {
-    var title by remember { mutableStateOf(initialTask?.title ?: "") }
-    var description by remember { mutableStateOf(initialTask?.description ?: "") }
-    var pay by remember { mutableStateOf(initialTask?.reward?.replace("₹", "") ?: "") }
-    
-    // Attempt to split date and time if deadline is in expected format
-    val deadlineParts = initialTask?.deadline?.split(", ")
-    var date by remember { mutableStateOf(deadlineParts?.getOrNull(0) ?: "") }
-    var time by remember { mutableStateOf(deadlineParts?.getOrNull(1) ?: "") }
-    var location by remember { mutableStateOf(initialTask?.location ?: "") }
+fun AddTaskDialog(onDismiss: () -> Unit, onPost: (TaskItem) -> Unit) {
+    var title by remember { mutableStateOf("") }
+    var description by remember { mutableStateOf("") }
+    var budget by remember { mutableStateOf("") }
+    var location by remember { mutableStateOf("") }
+    var deadline by remember { mutableStateOf("") }
+    var category by remember { mutableStateOf("Home") }
+    var categoryExpanded by remember { mutableStateOf(false) }
+
+    val categories = listOf("Home", "Errands", "Academic", "Delivery", "Pets", "Others")
 
     Dialog(onDismissRequest = onDismiss) {
-        Card(shape = RoundedCornerShape(24.dp), colors = CardDefaults.cardColors(containerColor = AppSurface)) {
-            Column(modifier = Modifier.padding(24.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                Text(text = if (initialTask == null) "Post a New Task" else "Edit Task", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+        Card(
+            shape = RoundedCornerShape(24.dp),
+            colors = CardDefaults.cardColors(containerColor = AppSurface),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(
+                modifier = Modifier
+                    .padding(24.dp)
+                    .fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                Text("Post a New Task", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = AppTeal)
 
-                // Photo Upload Section
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(120.dp)
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(AppBorder.copy(alpha = 0.3f))
-                        .clickable { /* Photo Picker Logic */ },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(Icons.Default.AddAPhoto, contentDescription = null, tint = AppTeal, modifier = Modifier.size(32.dp))
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text("Upload Task Photo", fontSize = 12.sp, color = TextSecondary)
+                OutlinedTextField(
+                    value = title,
+                    onValueChange = { title = it },
+                    label = { Text("Task Title") },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    singleLine = true
+                )
+
+                OutlinedTextField(
+                    value = description,
+                    onValueChange = { description = it },
+                    label = { Text("Description") },
+                    modifier = Modifier.fillMaxWidth(),
+                    minLines = 3,
+                    shape = RoundedCornerShape(12.dp)
+                )
+
+                // Category dropdown
+                ExposedDropdownMenuBox(expanded = categoryExpanded, onExpandedChange = { categoryExpanded = !categoryExpanded }) {
+                    OutlinedTextField(
+                        value = category,
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text("Category") },
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = categoryExpanded) },
+                        modifier = Modifier.menuAnchor().fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors()
+                    )
+                    ExposedDropdownMenu(expanded = categoryExpanded, onDismissRequest = { categoryExpanded = false }) {
+                        categories.forEach { opt ->
+                            DropdownMenuItem(text = { Text(opt) }, onClick = { category = opt; categoryExpanded = false })
+                        }
                     }
                 }
 
-                OutlinedTextField(
-                    value = title, 
-                    onValueChange = { title = it }, 
-                    label = { Text("Task Title") }, 
-                    modifier = Modifier.fillMaxWidth(), 
-                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = AppTeal, unfocusedBorderColor = AppBorder), 
-                    shape = RoundedCornerShape(12.dp)
-                )
-
-                OutlinedTextField(
-                    value = description, 
-                    onValueChange = { description = it }, 
-                    label = { Text("Description") }, 
-                    modifier = Modifier.fillMaxWidth(), 
-                    minLines = 3, 
-                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = AppTeal, unfocusedBorderColor = AppBorder), 
-                    shape = RoundedCornerShape(12.dp)
-                )
-
-                OutlinedTextField(
-                    value = pay, 
-                    onValueChange = { pay = it }, 
-                    label = { Text("Pay (₹)") }, 
-                    modifier = Modifier.fillMaxWidth(), 
-                    prefix = { Text("₹") },
-                    placeholder = { Text("Enter amount in Rupees") },
-                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = AppTeal, unfocusedBorderColor = AppBorder), 
-                    shape = RoundedCornerShape(12.dp)
-                )
-
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(Modifier.fillMaxWidth(), Arrangement.spacedBy(8.dp)) {
                     OutlinedTextField(
-                        value = date,
-                        onValueChange = { date = it },
-                        label = { Text("Date") },
+                        value = budget,
+                        onValueChange = { if (it.all { c -> c.isDigit() }) budget = it },
+                        label = { Text("Budget (₹)") },
                         modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(12.dp),
-                        leadingIcon = { Icon(Icons.Default.DateRange, contentDescription = null, modifier = Modifier.size(20.dp)) },
-                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = AppTeal, unfocusedBorderColor = AppBorder)
+                        singleLine = true,
+                        leadingIcon = { Text("₹", color = AppTeal, fontWeight = FontWeight.Bold) }
                     )
                     OutlinedTextField(
-                        value = time,
-                        onValueChange = { time = it },
-                        label = { Text("Time") },
+                        value = deadline,
+                        onValueChange = { deadline = it },
+                        label = { Text("Deadline") },
                         modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(12.dp),
-                        leadingIcon = { Icon(Icons.Default.AccessTime, contentDescription = null, modifier = Modifier.size(20.dp)) },
-                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = AppTeal, unfocusedBorderColor = AppBorder)
+                        singleLine = true,
+                        placeholder = { Text("e.g. Today 5 PM") }
                     )
                 }
 
                 OutlinedTextField(
-                    value = location, 
-                    onValueChange = { location = it }, 
-                    label = { Text("Location") }, 
-                    modifier = Modifier.fillMaxWidth(), 
-                    leadingIcon = { Icon(Icons.Default.Place, contentDescription = null, modifier = Modifier.size(20.dp)) },
-                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = AppTeal, unfocusedBorderColor = AppBorder), 
-                    shape = RoundedCornerShape(12.dp)
+                    value = location,
+                    onValueChange = { location = it },
+                    label = { Text("Location") },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    singleLine = true,
+                    leadingIcon = { Icon(Icons.Default.Place, null, tint = AppTeal) }
                 )
 
-                Spacer(modifier = Modifier.height(8.dp))
-
                 Button(
-                    onClick = { 
-                        if (title.isNotBlank() && description.isNotBlank()) {
-                            onPost(Task(title, description, "$date, $time", location, initialTask?.category ?: "Task", "₹$pay"))
+                    onClick = {
+                        if (title.isNotBlank() && description.isNotBlank() && location.isNotBlank()) {
+                            onPost(
+                                TaskItem(
+                                    id = (1000..9999).random(),
+                                    title = title,
+                                    description = description,
+                                    category = category,
+                                    budget = budget.toIntOrNull() ?: 0,
+                                    location = location,
+                                    deadline = deadline.ifBlank { "Flexible" },
+                                    posterName = "You",
+                                    posterAvatar = "",
+                                    status = "Posted",
+                                    distance = "0.0 km"
+                                )
+                            )
                         }
                     },
-                    modifier = Modifier.fillMaxWidth().height(50.dp),
+                    modifier = Modifier.fillMaxWidth().height(52.dp),
                     shape = RoundedCornerShape(12.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = AppTeal)
                 ) {
-                    Text(if (initialTask == null) "Post Task" else "Save Changes", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                    Text("Post Task", fontWeight = FontWeight.Bold, fontSize = 16.sp)
                 }
             }
         }

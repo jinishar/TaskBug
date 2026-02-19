@@ -1,9 +1,12 @@
 package com.example.taskbug.ui.auth
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
@@ -16,62 +19,111 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-// Main composable for the Login/Registration Screen
+private val AppTeal = Color(0xFF0F766E)
+private val AppBackground = Color(0xFFF9FAFB)
+private val TextPrimary = Color(0xFF111827)
+private val TextSecondary = Color(0xFF6B7280)
+
 @Composable
 fun LoginScreen(
-    // These would be hoisted to a ViewModel in a full implementation
-    onLoginClicked: (String, String) -> Unit, 
-    onSignUpClicked: (String, String) -> Unit,
+    onLoginClicked: (String, String) -> Unit,
+    onSignUpClicked: (String, String, String, String) -> Unit,
     authError: String? = null,
     isLoading: Boolean = false
 ) {
+    var isSignUpMode by remember { mutableStateOf(false) }
+
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
+    var name by remember { mutableStateOf("") }
+    var phone by remember { mutableStateOf("") }
     var isPasswordVisible by remember { mutableStateOf(false) }
 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFFF9FAFB)),
+            .background(AppBackground),
         contentAlignment = Alignment.Center
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 24.dp),
+                .padding(horizontal = 24.dp)
+                .verticalScroll(rememberScrollState()),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
+            Spacer(Modifier.height(48.dp))
+
+            // Logo area
+            Box(
+                modifier = Modifier
+                    .size(72.dp)
+                    .background(AppTeal, RoundedCornerShape(20.dp)),
+                contentAlignment = Alignment.Center
+            ) {
+                Text("🐛", fontSize = 36.sp)
+            }
+
+            Spacer(Modifier.height(16.dp))
+
             Text(
-                text = "Welcome to TaskBug",
+                text = if (isSignUpMode) "Create Account" else "Welcome back",
                 fontSize = 28.sp,
                 fontWeight = FontWeight.Bold,
-                color = Color(0xFF111827)
+                color = TextPrimary
             )
             Text(
-                text = "Sign in or create an account",
-                fontSize = 16.sp,
-                color = Color(0xFF6B7280),
+                text = if (isSignUpMode) "Join TaskBug to post or complete tasks" else "Sign in to your TaskBug account",
+                fontSize = 15.sp,
+                color = TextSecondary,
+                textAlign = TextAlign.Center,
                 modifier = Modifier.padding(top = 4.dp)
             )
 
-            Spacer(modifier = Modifier.height(32.dp))
+            Spacer(Modifier.height(32.dp))
 
-            // Email Field
+            // Name + Phone (sign up only)
+            if (isSignUpMode) {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text("Full Name") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    shape = RoundedCornerShape(12.dp),
+                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = AppTeal)
+                )
+                Spacer(Modifier.height(12.dp))
+                OutlinedTextField(
+                    value = phone,
+                    onValueChange = { phone = it },
+                    label = { Text("Phone Number") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    shape = RoundedCornerShape(12.dp),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = AppTeal)
+                )
+                Spacer(Modifier.height(12.dp))
+            }
+
             OutlinedTextField(
                 value = email,
                 onValueChange = { email = it },
                 label = { Text("Email Address") },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email)
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+                shape = RoundedCornerShape(12.dp),
+                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = AppTeal)
             )
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(Modifier.height(12.dp))
 
-            // Password Field
             OutlinedTextField(
                 value = password,
                 onValueChange = { password = it },
@@ -80,51 +132,69 @@ fun LoginScreen(
                 singleLine = true,
                 visualTransformation = if (isPasswordVisible) VisualTransformation.None else PasswordVisualTransformation(),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                shape = RoundedCornerShape(12.dp),
+                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = AppTeal),
                 trailingIcon = {
                     val image = if (isPasswordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff
                     IconButton(onClick = { isPasswordVisible = !isPasswordVisible }) {
-                        Icon(imageVector = image, contentDescription = "Toggle password visibility")
+                        Icon(imageVector = image, contentDescription = null)
                     }
                 }
             )
 
-            // Displaying authentication error
+            // Error
             if (authError != null) {
+                Spacer(Modifier.height(8.dp))
+                Text(authError, color = MaterialTheme.colorScheme.error, fontSize = 13.sp, textAlign = TextAlign.Center)
+            }
+
+            Spacer(Modifier.height(24.dp))
+
+            if (isLoading) {
+                CircularProgressIndicator(color = AppTeal)
+            } else {
+                Button(
+                    onClick = {
+                        if (isSignUpMode) {
+                            onSignUpClicked(name, email, phone, password)
+                        } else {
+                            onLoginClicked(email, password)
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth().height(52.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = AppTeal)
+                ) {
+                    Text(
+                        if (isSignUpMode) "Create Account" else "Login",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+
+            Spacer(Modifier.height(16.dp))
+
+            // Toggle between login / sign up
+            Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    text = authError,
-                    color = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.padding(top = 8.dp)
+                    text = if (isSignUpMode) "Already have an account? " else "Don't have an account? ",
+                    fontSize = 14.sp,
+                    color = TextSecondary
+                )
+                Text(
+                    text = if (isSignUpMode) "Login" else "Sign Up",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = AppTeal,
+                    modifier = Modifier.clickable {
+                        isSignUpMode = !isSignUpMode
+                        email = ""; password = ""; name = ""; phone = ""
+                    }
                 )
             }
 
-            Spacer(modifier = Modifier.height(24.dp))
-            
-            if (isLoading) {
-                CircularProgressIndicator()
-            } else {
-                 // Action Buttons
-                Button(
-                    onClick = { onLoginClicked(email, password) },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(52.dp),
-                    shape = RoundedCornerShape(12.dp)
-                ) {
-                    Text("Login", fontSize = 16.sp, fontWeight = FontWeight.Medium)
-                }
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                OutlinedButton(
-                    onClick = { onSignUpClicked(email, password) },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(52.dp),
-                    shape = RoundedCornerShape(12.dp)
-                ) {
-                    Text("Sign Up", fontSize = 16.sp, fontWeight = FontWeight.Medium)
-                }
-            }
+            Spacer(Modifier.height(48.dp))
         }
     }
 }
