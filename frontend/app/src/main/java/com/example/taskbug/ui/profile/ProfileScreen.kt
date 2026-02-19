@@ -54,7 +54,13 @@ fun ProfileScreen(authViewModel: AuthViewModel = viewModel()) {
     val context = LocalContext.current
 
     val userProfile by authViewModel.userProfile.collectAsState()
+    val isLoading by authViewModel.isLoading.collectAsState()
     var userLocation by remember(userProfile) { mutableStateOf(userProfile?.location ?: "") }
+
+    // Refresh profile when screen is first loaded
+    LaunchedEffect(Unit) {
+        authViewModel.refreshUserProfile()
+    }
 
     // Initialize Places SDK - IMPORTANT: Replace "YOUR_API_KEY" with your actual key
     if (!Places.isInitialized()) {
@@ -91,6 +97,24 @@ fun ProfileScreen(authViewModel: AuthViewModel = viewModel()) {
     Scaffold(
         containerColor = LightGrayBackground
     ) { padding ->
+        if (isLoading && userProfile == null) {
+            // Show loading state
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    CircularProgressIndicator(color = TaskBugTeal)
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text("Loading profile...", color = Color.Gray)
+                }
+            }
+        } else {
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -264,6 +288,7 @@ fun ProfileScreen(authViewModel: AuthViewModel = viewModel()) {
 
             Spacer(modifier = Modifier.height(40.dp))
         }
+        }
     }
 }
 
@@ -390,7 +415,7 @@ fun StatCard(title: String, value: String, icon: ImageVector, modifier: Modifier
 
 @Composable
 fun EditableField(label: String, initialValue: String) {
-    var text by remember { mutableStateOf(initialValue) }
+    var text by remember(initialValue) { mutableStateOf(initialValue) }
 
     OutlinedTextField(
         value = text,

@@ -47,12 +47,32 @@ class MainActivity : ComponentActivity() {
         setContent {
             MaterialTheme {
                 val userLoggedIn by authViewModel.userLoggedIn.collectAsState()
+                val signUpSuccess by authViewModel.signUpSuccess.collectAsState()
 
                 if (userLoggedIn) {
                     AppNavGraph(authViewModel = authViewModel) // If user is logged in, show the main app
                 } else {
                     // Otherwise, show the original login/signup flow
                     var screen by remember { mutableStateOf("splash") }
+                    var showSuccessDialog by remember { mutableStateOf(false) }
+
+                    // Listen to signUpSuccess and show dialog
+                    LaunchedEffect(signUpSuccess) {
+                        if (signUpSuccess) {
+                            showSuccessDialog = true
+                        }
+                    }
+
+                    // Success Dialog
+                    if (showSuccessDialog) {
+                        SuccessRegistrationDialog(
+                            onDismiss = {
+                                showSuccessDialog = false
+                                authViewModel.resetSignUpSuccess()
+                                screen = "login" // Route back to login
+                            }
+                        )
+                    }
 
                     when (screen) {
                         "splash" -> SplashScreen { screen = "login" }
@@ -281,3 +301,58 @@ fun AppTextField(
     )
     Spacer(Modifier.height(12.dp))
 }
+
+/* ---------- SUCCESS REGISTRATION DIALOG ---------- */
+
+@Composable
+fun SuccessRegistrationDialog(onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                "Registration Successful!",
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color(0xFF10B981)
+            )
+        },
+        text = {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                // Success Icon
+                Icon(
+                    painter = painterResource(id = android.R.drawable.ic_dialog_info),
+                    contentDescription = "Success",
+                    modifier = Modifier
+                        .size(60.dp)
+                        .padding(bottom = 16.dp),
+                    tint = Color(0xFF10B981)
+                )
+
+                Text(
+                    "Your account has been created successfully!\n\nPlease log in with your credentials to continue.",
+                    fontSize = 14.sp,
+                    color = Color.Gray,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = onDismiss,
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
+                shape = RoundedCornerShape(8.dp)
+            ) {
+                Text("Continue to Login", color = Color.White)
+            }
+        },
+        modifier = Modifier
+            .padding(16.dp)
+            .background(Color.White, shape = RoundedCornerShape(16.dp)),
+        containerColor = Color.White,
+        shape = RoundedCornerShape(16.dp)
+    )
+}
+
