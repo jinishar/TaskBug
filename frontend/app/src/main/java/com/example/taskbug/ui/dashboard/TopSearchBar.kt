@@ -13,16 +13,18 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import androidx.navigation.compose.currentBackStackEntryAsState
 
-private val Terra   = Color(0xFFC1603A)
-private val Cream   = Color(0xFFFAF6F1)
-private val Border  = Color(0xFFEAE0D8)
-private val Ink     = Color(0xFF1E1712)
-private val Muted   = Color(0xFFA08878)
+private val Terra  = Color(0xFFC1603A)
+private val Cream  = Color(0xFFFAF6F1)
+private val Border = Color(0xFFEAE0D8)
+private val Muted  = Color(0xFFA08878)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun TopSearchBar(navController: NavController) {
-    var query by remember { mutableStateOf("") }
+fun TopSearchBar(
+    navController: NavController,
+    query: String,
+    onQueryChange: (String) -> Unit
+) {
     var showFilterSheet by remember { mutableStateOf(false) }
 
     val navBackStackEntry by navController.currentBackStackEntryAsState()
@@ -38,8 +40,13 @@ fun TopSearchBar(navController: NavController) {
         ) {
             OutlinedTextField(
                 value = query,
-                onValueChange = { query = it },
-                placeholder = { Text("Search tasks, events…", color = Muted) },
+                onValueChange = onQueryChange,
+                placeholder = {
+                    Text(
+                        if (isTaskFilter) "Search tasks…" else "Search events…",
+                        color = Muted
+                    )
+                },
                 singleLine = true,
                 shape = RoundedCornerShape(14.dp),
                 modifier = Modifier
