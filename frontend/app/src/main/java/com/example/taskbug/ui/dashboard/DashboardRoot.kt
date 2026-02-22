@@ -3,8 +3,7 @@ package com.example.taskbug.ui.dashboard
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Scaffold
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -23,13 +22,22 @@ fun DashboardRoot(authViewModel: AuthViewModel) {
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
 
-    // Show search bar only on tasks and events screens
+    // ── Shared search state lifted here so TopSearchBar can drive both screens ──
+    var searchQuery by remember { mutableStateOf("") }
+
     val showTopBar = currentRoute == "tasks" || currentRoute == "events"
+
+    // Reset search when switching tabs
+    LaunchedEffect(currentRoute) { searchQuery = "" }
 
     Scaffold(
         topBar = {
             if (showTopBar) {
-                TopSearchBar(navController = navController)
+                TopSearchBar(
+                    navController = navController,
+                    query = searchQuery,
+                    onQueryChange = { searchQuery = it }
+                )
             }
         },
         bottomBar = {
@@ -41,9 +49,9 @@ fun DashboardRoot(authViewModel: AuthViewModel) {
             startDestination = "tasks",
             modifier = Modifier.padding(innerPadding)
         ) {
-            composable("tasks") { TasksScreen() }
-            composable("events") { EventsScreen() }
-            composable("chat") { ChatScreen() }
+            composable("tasks")   { TasksScreen(searchQuery = searchQuery) }
+            composable("events")  { EventsScreen(searchQuery = searchQuery) }
+            composable("chat")    { ChatScreen() }
             composable("profile") { ProfileScreen(authViewModel = authViewModel) }
         }
     }
