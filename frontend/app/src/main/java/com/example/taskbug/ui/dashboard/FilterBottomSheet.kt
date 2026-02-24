@@ -24,10 +24,16 @@ private val AppTeal = Color(0xFF0F766E)
 @Composable
 fun FilterBottomSheet(
     isTaskFilter: Boolean,
+    selectedCategory: String? = null,
+    selectedPriceRange: ClosedFloatingPointRange<Float> = 0f..10000f,
+    onApplyFilters: (category: String?, priceRange: ClosedFloatingPointRange<Float>) -> Unit = { _, _ -> },
     onDismiss: () -> Unit,
-    onApply: () -> Unit
+    onClearAll: () -> Unit = {}
 ) {
     val scrollState = rememberScrollState()
+    // Local state for this bottom sheet
+    var localSelectedCategory by remember(selectedCategory) { mutableStateOf(selectedCategory) }
+    var localPriceRange by remember(selectedPriceRange) { mutableStateOf(selectedPriceRange) }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -62,18 +68,20 @@ fun FilterBottomSheet(
             // CATEGORY SECTION (Renamed/Updated based on domain)
             FilterSection(title = "Category", icon = Icons.Default.Category) {
                 val categories = if (isTaskFilter) 
-                    listOf("Shopping", "Home", "Pets", "Delivery", "Others")
-                else 
-                    listOf("Tech", "Volunteer", "Networking", "Social", "Others")
-                
+                    listOf("All", "Shopping", "Home", "Pets", "Delivery", "Others")
+                else
+                    listOf("All", "Tech", "Volunteer", "Networking", "Social", "Others")
+
                 FlowRow(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     categories.forEach { category ->
                         FilterChip(
-                            selected = false,
-                            onClick = {},
+                            selected = localSelectedCategory == category || (category == "All" && localSelectedCategory == null),
+                            onClick = {
+                                localSelectedCategory = if (category == "All") null else category
+                            },
                             label = { Text(category) },
                             colors = FilterChipDefaults.filterChipColors(
                                 selectedContainerColor = AppTeal.copy(alpha = 0.1f),
@@ -86,11 +94,12 @@ fun FilterBottomSheet(
 
             // PRICE RANGE (0 to 10000)
             FilterSection(title = if (isTaskFilter) "Price / Reward" else "Entry Fee", icon = Icons.Default.Payments) {
-                var sliderPosition by remember { mutableStateOf(0f..10000f) }
                 Column {
                     RangeSlider(
-                        value = sliderPosition,
-                        onValueChange = { sliderPosition = it },
+                        value = localPriceRange,
+                        onValueChange = {
+                            localPriceRange = it
+                        },
                         valueRange = 0f..10000f,
                         colors = SliderDefaults.colors(
                             thumbColor = AppTeal,
@@ -98,8 +107,8 @@ fun FilterBottomSheet(
                         )
                     )
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text("₹${sliderPosition.start.roundToInt()}", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = AppTeal)
-                        Text("₹${sliderPosition.endInclusive.roundToInt()}", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = AppTeal)
+                        Text("₹${localPriceRange.start.roundToInt()}", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = AppTeal)
+                        Text("₹${localPriceRange.endInclusive.roundToInt()}", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = AppTeal)
                     }
                 }
             }
@@ -185,13 +194,22 @@ fun FilterBottomSheet(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 TextButton(
-                    onClick = {},
+                    onClick = {
+                        localSelectedCategory = null
+                        localPriceRange = 0f..10000f
+                        onClearAll()
+                        onDismiss()
+                    },
                     modifier = Modifier.weight(1f)
                 ) {
                     Text("Clear All", color = Color.Gray)
                 }
                 Button(
-                    onClick = onApply,
+                    onClick = {
+                        // Apply filters and close sheet
+                        onApplyFilters(localSelectedCategory, localPriceRange)
+                        onDismiss()
+                    },
                     modifier = Modifier
                         .weight(1.5f)
                         .height(52.dp),

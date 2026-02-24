@@ -66,6 +66,13 @@ dependencies {
     implementation("com.google.firebase:firebase-firestore")
     implementation("com.google.firebase:firebase-database-ktx")
     implementation("com.google.firebase:firebase-database")
+    // firebase-storage removed — using Cloudinary free tier instead
+
+    // OkHttp for Cloudinary multipart image upload
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+
+    // Coil for async image loading (Cloudinary/HTTPS URLs)
+    implementation("io.coil-kt:coil-compose:2.6.0")
 
     // Coroutines support
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.7.3")

@@ -62,8 +62,8 @@ fun TopSearchBar(navController: NavController) {
     if (showFilterSheet) {
         FilterBottomSheet(
             isTaskFilter = isTaskFilter,
-            onDismiss = { showFilterSheet = false },
-            onApply = { showFilterSheet = false }
+            onApplyFilters = { _, _ -> },
+            onDismiss = { showFilterSheet = false }
         )
     }
 }
