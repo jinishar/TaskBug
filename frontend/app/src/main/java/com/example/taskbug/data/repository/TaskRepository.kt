@@ -50,7 +50,6 @@ class TaskRepository {
 
         val listener = tasksCollection
             .whereEqualTo("status", "active")
-            .orderBy("createdAt", Query.Direction.DESCENDING)
             .addSnapshotListener { snapshot, error ->
                 if (error != null) {
                     Log.e(TAG, "Error fetching tasks: ${error.message}", error)
@@ -66,7 +65,7 @@ class TaskRepository {
                             Log.e(TAG, "Error parsing task: ${e.message}", e)
                             null
                         }
-                    }
+                    }.sortedByDescending { it.createdAt?.time ?: 0L }
                     Log.d(TAG, "Fetched ${tasks.size} active tasks")
                     trySend(tasks)
                 }
@@ -86,7 +85,6 @@ class TaskRepository {
 
         val listener = tasksCollection
             .whereEqualTo("userId", userId)
-            .orderBy("createdAt", Query.Direction.DESCENDING)
             .addSnapshotListener { snapshot, error ->
                 if (error != null) {
                     Log.e(TAG, "Error fetching user tasks: ${error.message}", error)
@@ -97,7 +95,33 @@ class TaskRepository {
                 if (snapshot != null) {
                     val tasks = snapshot.documents.mapNotNull { doc ->
                         doc.toObject(Task::class.java)?.copy(id = doc.id)
-                    }
+                    }.sortedByDescending { it.createdAt?.time ?: 0L }
+                    trySend(tasks)
+                }
+            }
+
+        awaitClose { listener.remove() }
+    }
+
+    /**
+     * Get tasks where a specific user is enrolled
+     */
+    fun getEnrolledTasks(userId: String): Flow<List<Task>> = callbackFlow {
+        Log.d(TAG, "Setting up listener for enrolled tasks: $userId")
+
+        val listener = tasksCollection
+            .whereEqualTo("enrolledUserId", userId)
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    Log.e(TAG, "Error fetching enrolled tasks: ${error.message}", error)
+                    close(error)
+                    return@addSnapshotListener
+                }
+
+                if (snapshot != null) {
+                    val tasks = snapshot.documents.mapNotNull { doc ->
+                        doc.toObject(Task::class.java)?.copy(id = doc.id)
+                    }.sortedByDescending { it.createdAt?.time ?: 0L }
                     trySend(tasks)
                 }
             }

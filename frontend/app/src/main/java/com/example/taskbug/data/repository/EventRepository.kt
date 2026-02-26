@@ -71,7 +71,6 @@ class EventRepository {
         Log.d(TAG, "Setting up listener for user events: $userId")
         val listener = eventsCollection
             .whereEqualTo("userId", userId)
-            .orderBy("createdAt", Query.Direction.DESCENDING)
             .addSnapshotListener { snapshot, error ->
                 if (error != null) {
                     Log.e(TAG, "Error fetching user events: ${error.message}", error)
@@ -80,7 +79,7 @@ class EventRepository {
                 if (snapshot != null) {
                     val events = snapshot.documents.mapNotNull { doc ->
                         doc.toObject(Event::class.java)?.copy(id = doc.id)
-                    }
+                    }.sortedByDescending { it.createdAt?.time ?: 0L }
                     Log.d(TAG, "Fetched ${events.size} events for user $userId")
                     trySend(events)
                 }

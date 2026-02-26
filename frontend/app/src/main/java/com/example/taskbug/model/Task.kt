@@ -16,7 +16,9 @@ data class Task(
     @ServerTimestamp
     val createdAt: Date? = null,
     val status: String = "active",
-    val imageUrl: String = ""
+    val imageUrl: String = "",
+    val enrolledUserId: String = "",
+    val enrolledUserName: String = ""
 )
 
 

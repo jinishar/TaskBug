@@ -20,6 +20,7 @@ data class TaskUiState(
     val successMessage: String? = null,
     val tasks: List<Task> = emptyList(),
     val userTasks: List<Task> = emptyList(),
+    val enrolledTasks: List<Task> = emptyList(),
     val allTasks: List<Task> = emptyList(),  // Store unfiltered tasks for filtering
     val selectedCategory: String? = null,
     val selectedPriceRange: ClosedFloatingPointRange<Float> = 0f..10000f
@@ -47,6 +48,7 @@ class TaskViewModel : ViewModel() {
         Log.d(TAG, "TaskViewModel initialized")
         loadActiveTasks()
         loadUserTasks()
+        loadEnrolledTasks()
     }
 
     /**
@@ -155,9 +157,6 @@ class TaskViewModel : ViewModel() {
         }
     }
 
-    /**
-     * Load user's own tasks
-     */
     fun loadUserTasks() {
         viewModelScope.launch {
             val userId = auth.currentUser?.uid
@@ -173,6 +172,92 @@ class TaskViewModel : ViewModel() {
             } catch (e: Exception) {
                 Log.e(TAG, "Error loading user tasks: ${e.message}", e)
                 _uiState.value = _uiState.value.copy(error = "Failed to load your tasks")
+            }
+        }
+    }
+
+    /**
+     * Load tasks the current user is enrolled in
+     */
+    fun loadEnrolledTasks() {
+        viewModelScope.launch {
+            val userId = auth.currentUser?.uid ?: return@launch
+            try {
+                repository.getEnrolledTasks(userId).collect { tasks ->
+                    _uiState.value = _uiState.value.copy(enrolledTasks = tasks)
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error loading enrolled tasks: ${e.message}", e)
+            }
+        }
+    }
+
+    /**
+     * Enroll in a task
+     */
+    fun enrollTask(taskId: String) {
+        val currentUser = auth.currentUser ?: return
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isLoading = true)
+            try {
+                var userName = currentUser.displayName ?: "Anonymous"
+                try {
+                    val userSnapshot = usersRef.child(currentUser.uid).get().await()
+                    if (userSnapshot.exists()) {
+                        val dbName = userSnapshot.child("name").getValue(String::class.java)
+                        if (!dbName.isNullOrBlank()) userName = dbName
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "Non-critical: couldn't fetch name from RTDB, using displayName: ${e.message}")
+                }
+
+                val updates = mapOf(
+                    "status" to "assigned",
+                    "enrolledUserId" to currentUser.uid,
+                    "enrolledUserName" to userName
+                )
+                
+                val result = repository.updateTask(taskId, updates)
+                result.onSuccess {
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        successMessage = "Successfully enrolled in task!"
+                    )
+                    clearSuccessMessage()
+                }.onFailure { exception ->
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        error = "Failed to enroll: ${exception.message}"
+                    )
+                }
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    error = "Failed to enroll: ${e.message}"
+                )
+            }
+        }
+    }
+
+    /**
+     * Mark an assigned task as completed by the owner
+     */
+    fun markTaskCompleted(taskId: String) {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isLoading = true)
+            val updates = mapOf("status" to "completed")
+            val result = repository.updateTask(taskId, updates)
+            result.onSuccess {
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    successMessage = "Task marked as completed!"
+                )
+                clearSuccessMessage()
+            }.onFailure { exception ->
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    error = "Failed to mark as completed: ${exception.message}"
+                )
             }
         }
     }

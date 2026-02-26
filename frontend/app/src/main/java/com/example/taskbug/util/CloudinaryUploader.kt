@@ -24,7 +24,7 @@ private const val TAG = "CloudinaryUploader"
  */
 object CloudinaryUploader {
 
-    private const val CLOUD_NAME    = "dkthpokztb"
+    private const val CLOUD_NAME    = "dkhpxkzib"
     /**
      * !! IMPORTANT !!
      * Open Cloudinary Console → Settings → Upload → click your preset to edit it.
@@ -51,14 +51,19 @@ object CloudinaryUploader {
                 val base64 = Base64.encodeToString(imageBytes, Base64.NO_WRAP)
                 val dataUrl = "data:image/jpeg;base64,$base64"
 
-                // 3. Build plain form body — no multipart, no filename header
                 val body = FormBody.Builder()
                     .add("file", dataUrl)
                     .add("upload_preset", UPLOAD_PRESET)
                     .build()
 
+                val uploadUrl = "https://api.cloudinary.com/v1_1/$CLOUD_NAME/image/upload"
+                Log.d(TAG, "=== CLOUDINARY UPLOAD DEBUG ===")
+                Log.d(TAG, "URL: $uploadUrl")
+                Log.d(TAG, "Preset: '$UPLOAD_PRESET'")
+                Log.d(TAG, "Image size: ${imageBytes.size} bytes")
+
                 val request = Request.Builder()
-                    .url("https://api.cloudinary.com/v1_1/$CLOUD_NAME/image/upload")
+                    .url(uploadUrl)
                     .post(body)
                     .build()
 

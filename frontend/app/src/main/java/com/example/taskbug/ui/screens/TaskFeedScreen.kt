@@ -18,6 +18,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import android.widget.Toast
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -44,6 +46,21 @@ fun TaskFeedScreen(
     val uiState by viewModel.uiState.collectAsState()
     val currentUserId = viewModel.getCurrentUserId()
     var showFilterSheet by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+
+    LaunchedEffect(uiState.error) {
+        uiState.error?.let {
+            Toast.makeText(context, it, Toast.LENGTH_LONG).show()
+            viewModel.clearError()
+        }
+    }
+
+    LaunchedEffect(uiState.successMessage) {
+        uiState.successMessage?.let {
+            Toast.makeText(context, it, Toast.LENGTH_SHORT).show()
+            viewModel.clearSuccessMessage()
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -124,7 +141,8 @@ fun TaskFeedScreen(
                         task = task,
                         isOwner = task.userId == currentUserId,
                         onEdit = { onEditTask(task.id) },
-                        onDelete = { viewModel.deleteTask(task.id, task.userId) }
+                        onDelete = { viewModel.deleteTask(task.id, task.userId) },
+                        onEnroll = { viewModel.enrollTask(task.id) }
                     )
                 }
             }
@@ -156,7 +174,8 @@ fun TaskCard(
     task: Task,
     isOwner: Boolean,
     onEdit: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    onEnroll: () -> Unit
 ) {
     var showMenu by remember { mutableStateOf(false) }
     var showDeleteConfirm by remember { mutableStateOf(false) }
@@ -254,6 +273,19 @@ fun TaskCard(
             }
 
             Spacer(modifier = Modifier.height(8.dp))
+
+            // Enroll Button (for non-owners)
+            if (!isOwner && task.status == "active") {
+                Button(
+                    onClick = onEnroll,
+                    colors = ButtonDefaults.buttonColors(containerColor = AppTeal),
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Enroll in Task", color = Color.White, fontWeight = FontWeight.Bold)
+                }
+                Spacer(modifier = Modifier.height(12.dp))
+            }
 
             // Description
             Text(

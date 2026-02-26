@@ -28,6 +28,10 @@ import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Locale
 
+import androidx.navigation.NavController
+import androidx.compose.runtime.livedata.observeAsState
+import androidx.compose.runtime.saveable.rememberSaveable
+
 private val AppTeal = Color(0xFF0F766E)
 private val AppBackground = Color(0xFFF9FAFB)
 private val TextPrimary = Color(0xFF1F2937)
@@ -37,19 +41,32 @@ private val AppBorder = Color(0xFFE5E7EB)
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddTaskScreen(
+    navController: NavController,
     onTaskCreated: () -> Unit,
     onDismiss: () -> Unit,
     viewModel: TaskViewModel = viewModel()
 ) {
-    var title by remember { mutableStateOf("") }
-    var description by remember { mutableStateOf("") }
-    var category by remember { mutableStateOf("") }
-    var deadline by remember { mutableStateOf("") }
-    var pay by remember { mutableStateOf("") }
-    var location by remember { mutableStateOf("") }
-    var showDatePicker by remember { mutableStateOf(false) }
+    var title by rememberSaveable { mutableStateOf("") }
+    var description by rememberSaveable { mutableStateOf("") }
+    var category by rememberSaveable { mutableStateOf("") }
+    var deadline by rememberSaveable { mutableStateOf("") }
+    var pay by rememberSaveable { mutableStateOf("") }
+    var location by rememberSaveable { mutableStateOf("") }
+    var showDatePicker by rememberSaveable { mutableStateOf(false) }
 
     val uiState by viewModel.uiState.collectAsState()
+
+    // Observe result from MapPickerScreen
+    val savedStateHandle = navController.currentBackStackEntry?.savedStateHandle
+    val selectedLocation = savedStateHandle?.getLiveData<String>("selected_location")?.observeAsState()
+    
+    LaunchedEffect(selectedLocation?.value) {
+        val loc = selectedLocation?.value as? String
+        if (!loc.isNullOrBlank()) {
+            location = loc
+            savedStateHandle?.remove<String>("selected_location")
+        }
+    }
 
     LaunchedEffect(uiState.successMessage) {
         if (uiState.successMessage != null) {
@@ -207,11 +224,14 @@ fun AddTaskScreen(
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
             shape = RoundedCornerShape(12.dp),
-            leadingIcon = {
+            trailingIcon = {
                 Icon(
                     Icons.Default.Place,
-                    contentDescription = null,
-                    modifier = Modifier.size(20.dp)
+                    contentDescription = "Pick Location",
+                    modifier = Modifier.size(24.dp).clickable { 
+                        navController.navigate("map_picker") 
+                    },
+                    tint = AppTeal
                 )
             },
             colors = OutlinedTextFieldDefaults.colors(

@@ -1,0 +1,633 @@
+================================================================================
+              TASKBUG APPLICATION — COMPLETE DATA FLOW DOCUMENTATION
+              Backend Integration, Database APIs & Major Business Logic
+================================================================================
+              Date: 26 February 2026
+================================================================================
+
+
+TABLE OF CONTENTS
+-----------------
+1. Architecture Overview
+2. Firebase Services Used
+3. Data Models
+4. Authentication Flow (Firebase Auth + Realtime Database)
+5. Task Module — Full Data Flow
+6. Event Module — Full Data Flow
+7. Live Location Sharing Module — Full Data Flow
+8. Image Upload — Cloudinary Integration
+9. Navigation & Screen Routing
+10. Firestore Security Rules
+11. File-by-File Reference
+
+
+================================================================================
+1. ARCHITECTURE OVERVIEW
+================================================================================
+
+TaskBug follows the MVVM (Model-View-ViewModel) architecture pattern:
+
+    UI (Compose Screens)
+          |
+          v
+    ViewModel (Business Logic + State Management)
+          |
+          v
+    Repository (Data Access Layer)
+          |
+          v
+    Firebase Backend (Firestore, Realtime DB, Auth, Cloudinary)
+
+Key Layers:
+  - MODEL LAYER      : Data classes (Task.kt, Event.kt, UserLocation.kt)
+  - REPOSITORY LAYER : TaskRepository, EventRepository, FirebaseLocationRepository
+  - VIEWMODEL LAYER  : TaskViewModel, EventViewModel, AuthViewModel, MapViewModel
+  - UI LAYER         : Compose Screens (TaskFeedScreen, EventScreen, ProfileScreen, etc.)
+  - UTILITIES        : CloudinaryUploader (image uploads)
+
+
+================================================================================
+2. FIREBASE SERVICES USED
+================================================================================
+
++-----------------------------+-------------------------------------------+----------------------------+
+| Service                     | Purpose                                   | Database URL / Config      |
++-----------------------------+-------------------------------------------+----------------------------+
+| Firebase Authentication     | User sign-up, sign-in, sign-out           | Default Firebase project   |
+| Firebase Realtime Database  | User profiles, live location sharing      | https://taskbugcu-default- |
+|                             |                                           | rtdb.asia-southeast1.      |
+|                             |                                           | firebasedatabase.app       |
+| Cloud Firestore             | Tasks collection, Events collection       | Default Firestore instance |
+| Cloudinary (3rd party)      | Event banner image uploads                | Cloud: dkhpxkzib           |
+|                             |                                           | Preset: my_unsigned_upload |
++-----------------------------+-------------------------------------------+----------------------------+
+
+WHY TWO DATABASES?
+  - Realtime Database is used for real-time, low-latency data like live GPS
+    locations and user profiles (name, phone, email, location text).
+  - Cloud Firestore is used for structured document data like tasks and events,
+    where complex queries (filters, sorting) are needed.
+
+
+================================================================================
+3. DATA MODELS
+================================================================================
+
+3.1 Task Model  (model/Task.kt)
+---------------------------------
+  Field              Type       Default     Description
+  ─────────────────  ─────────  ──────────  ──────────────────────────────────
+  id                 String     ""          Firestore document ID (set via doc.id)
+  title              String     ""          Task title
+  description        String     ""          Task description
+  category           String     ""          Category (Home, Delivery, etc.)
+  deadline           String     ""          Deadline date string
+  pay                Double     0.0         Payment amount in INR
+  location           String     ""          Location text
+  userId             String     ""          UID of the task creator
+  userName           String     ""          Display name of the task creator
+  createdAt          Date?      null        Server timestamp (auto-set by Firestore)
+  status             String     "active"    Lifecycle: "active" → "assigned" → "completed"
+  imageUrl           String     ""          (Reserved for future task images)
+  enrolledUserId     String     ""          UID of the user who enrolled
+  enrolledUserName   String     ""          Display name of the enrolled user
+
+
+3.2 Event Model  (model/Event.kt)
+-----------------------------------
+  Field              Type       Default     Description
+  ─────────────────  ─────────  ──────────  ──────────────────────────────────
+  id                 String     ""          Firestore document ID
+  title              String     ""          Event title
+  description        String     ""          Event description
+  eventDate          String     ""          Date in yyyy-MM-dd format
+  eventTime          String     ""          Time string, e.g. "06:00 PM"
+  venue              String     ""          Venue / location name
+  category           String     ""          Category (Academic, Sports, etc.)
+  ticketPrice        Double     0.0         Ticket price in INR (0 = Free)
+  maxAttendees       Int        0           Max capacity (0 = Unlimited)
+  imageUrl           String     ""          Cloudinary HTTPS URL for banner
+  userId             String     ""          UID of the event publisher
+  userName           String     ""          Display name of the publisher
+  createdAt          Date?      null        Server timestamp
+
+
+3.3 UserLocation Model  (model/UserLocation.kt)
+--------------------------------------------------
+  Field              Type       Default     Description
+  ─────────────────  ─────────  ──────────  ──────────────────────────────────
+  userId             String     ""          UID of the sharing user
+  userName           String     ""          Display name
+  latitude           Double     0.0         GPS latitude
+  longitude          Double     0.0         GPS longitude
+  timestamp          Long       0L          Epoch millis of last location update
+
+
+================================================================================
+4. AUTHENTICATION FLOW  (Firebase Auth + Realtime Database)
+================================================================================
+
+FILE: ui/auth/AuthViewModel.kt
+BACKEND: Firebase Authentication + Firebase Realtime Database
+
+4.1 SIGN-UP FLOW
+─────────────────
+  User Input: name, email, phone, password
+       │
+       ▼
+  FirebaseAuth.createUserWithEmailAndPassword(email, password)
+       │
+       ▼  (on success, get user.uid)
+  Realtime Database: "users/{uid}" ← {name, email, phone, location: ""}
+       │
+       ▼
+  UI shows SuccessRegistrationDialog → navigates to Login
+
+  API Calls:
+    1. auth.createUserWithEmailAndPassword(email, pass).await()
+    2. usersRef.child(user.uid).setValue(userProfile).await()
+
+
+4.2 SIGN-IN FLOW
+─────────────────
+  User Input: email, password
+       │
+       ▼
+  FirebaseAuth.signInWithEmailAndPassword(email, password)
+       │
+       ▼  (on success)
+  fetchCurrentUserProfile() → reads "users/{uid}" from Realtime DB
+       │
+       ▼
+  _userLoggedIn = true → UI navigates to Dashboard
+
+  API Calls:
+    1. auth.signInWithEmailAndPassword(email, pass).await()
+    2. usersRef.child(user.uid).addListenerForSingleValueEvent(...)
+
+
+4.3 PROFILE MANAGEMENT
+───────────────────────
+  updateUserProfile(name, phone):
+    → usersRef.child(uid).updateChildren({name, phone}).await()
+
+  updateUserLocation(location):
+    → usersRef.child(uid).child("location").setValue(location).await()
+
+
+4.4 SIGN-OUT
+─────────────
+  auth.signOut()
+  → Clears _userLoggedIn and _userProfile states
+  → UI navigates back to Login screen
+
+
+================================================================================
+5. TASK MODULE — FULL DATA FLOW
+================================================================================
+
+FILES:
+  - data/repository/TaskRepository.kt
+  - ui/tasks/TaskViewModel.kt
+  - ui/screens/TaskFeedScreen.kt
+  - ui/profile/ProfileScreen.kt
+
+BACKEND: Cloud Firestore → Collection: "tasks"
+
+
+5.1 CREATE TASK
+────────────────
+  User fills form → TaskViewModel.createTask(title, desc, category, deadline, pay, location)
+       │
+       ▼
+  Fetches user name from Realtime DB: usersRef.child(uid).child("name").get()
+       │
+       ▼
+  Constructs Task object with userId, userName, status = "active"
+       │
+       ▼
+  TaskRepository.createTask(task)
+    → tasksCollection.add(task).await()
+    → Returns Firestore document ID
+       │
+       ▼
+  UI updates: success toast, reloads active tasks
+
+  API Calls:
+    1. usersRef.child(uid).child("name").get().await()      [Realtime DB]
+    2. tasksCollection.add(task).await()                     [Firestore]
+
+
+5.2 LOAD ACTIVE TASKS (Feed Screen — Real-time)
+─────────────────────────────────────────────────
+  On ViewModel init → loadActiveTasks()
+       │
+       ▼
+  TaskRepository.getActiveTasks()
+    → tasksCollection.whereEqualTo("status", "active")
+      .addSnapshotListener { snapshot → ... }
+       │
+       ▼
+  Maps documents to Task objects (copies doc.id into task.id)
+  Sorts locally: .sortedByDescending { it.createdAt?.time ?: 0L }
+       │
+       ▼
+  Emits via Kotlin Flow → ViewModel collects into uiState.tasks
+       │
+       ▼
+  TaskFeedScreen renders LazyColumn of TaskCards
+
+  NOTE: Real-time listener — any change in Firestore auto-updates the feed.
+  NOTE: We do NOT use Firestore's .orderBy() to avoid needing a Composite Index.
+
+
+5.3 LOAD USER'S OWN TASKS (Profile Screen)
+────────────────────────────────────────────
+  On ViewModel init → loadUserTasks()
+       │
+       ▼
+  TaskRepository.getUserTasks(userId)
+    → tasksCollection.whereEqualTo("userId", currentUserId)
+      .addSnapshotListener { ... }
+       │
+       ▼
+  Sorted locally by createdAt descending
+  Emitted via Flow → uiState.userTasks
+       │
+       ▼
+  ProfileScreen renders "My Posted Tasks" section
+
+
+5.4 TASK ENROLLMENT (1-to-1 assignment)
+────────────────────────────────────────
+  Another user sees an "active" task → clicks "Enroll in Task"
+       │
+       ▼
+  TaskViewModel.enrollTask(taskId)
+       │
+       ▼
+  Fetches enrolling user's name from Realtime DB (fallback: displayName)
+       │
+       ▼
+  Updates Firestore document:
+    {
+      "status": "assigned",
+      "enrolledUserId": currentUser.uid,
+      "enrolledUserName": userName
+    }
+       │
+       ▼
+  TaskRepository.updateTask(taskId, updates)
+    → tasksCollection.document(taskId).update(updates).await()
+       │
+       ▼
+  Effects:
+    - Task disappears from Active Feed (status is no longer "active")
+    - Task appears in enrolled user's "My Enrolled Tasks" on Profile
+    - Task owner sees "assigned" status on their "My Posted Tasks"
+
+  API Calls:
+    1. usersRef.child(uid).get().await()                    [Realtime DB]
+    2. tasksCollection.document(taskId).update(updates)      [Firestore]
+
+
+5.5 LOAD ENROLLED TASKS (Profile Screen)
+──────────────────────────────────────────
+  On ViewModel init → loadEnrolledTasks()
+       │
+       ▼
+  TaskRepository.getEnrolledTasks(userId)
+    → tasksCollection.whereEqualTo("enrolledUserId", currentUserId)
+      .addSnapshotListener { ... }
+       │
+       ▼
+  Sorted locally, emitted via Flow → uiState.enrolledTasks
+       │
+       ▼
+  ProfileScreen renders "My Enrolled Tasks" section
+
+
+5.6 MARK TASK COMPLETED (Owner only)
+──────────────────────────────────────
+  Task owner sees "assigned" task → clicks Mark Completed icon
+       │
+       ▼
+  TaskViewModel.markTaskCompleted(taskId)
+    → updates: { "status": "completed" }
+    → tasksCollection.document(taskId).update(updates).await()
+       │
+       ▼
+  Task status changes to "completed" across all views
+
+
+5.7 DELETE TASK (Owner only)
+─────────────────────────────
+  TaskViewModel.deleteTask(taskId, ownerId)
+    → Checks: currentUser.uid == ownerId
+    → tasksCollection.document(taskId).delete().await()
+
+
+5.8 TASK FILTERING (Client-side)
+─────────────────────────────────
+  filterByCategory(category) → stores selected category in uiState
+  filterByPriceRange(range)  → stores selected price range in uiState
+  applyFilters()             → filters uiState.allTasks by category + price range
+  clearAllFilters()          → resets filters, shows all tasks
+
+
+================================================================================
+6. EVENT MODULE — FULL DATA FLOW
+================================================================================
+
+FILES:
+  - data/repository/EventRepository.kt
+  - ui/events/EventViewModel.kt
+  - ui/events/EventScreen.kt
+  - util/CloudinaryUploader.kt
+
+BACKEND: Cloud Firestore → Collection: "events" + Cloudinary for images
+
+
+6.1 CREATE EVENT
+─────────────────
+  User fills AddEventDialog → EventViewModel.createEvent(...)
+       │
+       ▼
+  Step 1: Upload banner image to Cloudinary
+    → EventRepository.uploadEventImage(context, imageUri, userId)
+    → CloudinaryUploader.uploadImage(context, imageUri)
+    → Returns HTTPS URL of uploaded image
+       │
+       ▼
+  Step 2: Fetch user name from Realtime DB
+    → usersRef.child(uid).child("name").get().await()
+       │
+       ▼
+  Step 3: Create Event object with all fields + imageUrl + userId + userName
+       │
+       ▼
+  Step 4: Save to Firestore
+    → EventRepository.createEvent(event)
+    → eventsCollection.add(event).await()
+
+  API Calls:
+    1. CloudinaryUploader.uploadImage()                      [Cloudinary REST API]
+    2. usersRef.child(uid).child("name").get().await()       [Realtime DB]
+    3. eventsCollection.add(event).await()                   [Firestore]
+
+
+6.2 LOAD ALL EVENTS (Feed Screen — Real-time)
+───────────────────────────────────────────────
+  On ViewModel init → loadAllEvents()
+       │
+       ▼
+  EventRepository.getAllEvents()
+    → eventsCollection.orderBy("createdAt", DESC)
+      .addSnapshotListener { ... }
+       │
+       ▼
+  Maps documents → Event objects (copies doc.id)
+  Emits via Flow → uiState.events
+       │
+       ▼
+  EventScreen renders LazyColumn of EventCards
+
+
+6.3 LOAD USER'S EVENTS (Profile Screen)
+─────────────────────────────────────────
+  On ViewModel init → loadUserEvents()
+       │
+       ▼
+  EventRepository.getUserEvents(userId)
+    → eventsCollection.whereEqualTo("userId", userId)
+      .addSnapshotListener { ... }
+    → Sorted locally by createdAt descending
+       │
+       ▼
+  Emits via Flow → uiState.userEvents
+
+
+6.4 UPDATE EVENT (Owner + 10-day edit window)
+──────────────────────────────────────────────
+  EventViewModel.updateEvent(eventId, ownerId, ...)
+       │
+       ▼
+  Checks: currentUser.uid == ownerId
+  Checks: canEditEvent(eventDateStr)
+    → Event must be MORE than 10 days away to allow editing
+       │
+       ▼
+  If new image provided → upload to Cloudinary first
+       │
+       ▼
+  EventRepository.updateEvent(eventId, updates)
+    → eventsCollection.document(eventId).update(updates).await()
+
+
+6.5 DELETE EVENT (Owner only)
+──────────────────────────────
+  EventViewModel.deleteEvent(eventId, ownerId)
+    → Checks: currentUser.uid == ownerId
+    → eventsCollection.document(eventId).delete().await()
+
+
+6.6 EVENT DETAILS POPUP — JOIN BUTTON LOGIC
+─────────────────────────────────────────────
+  When a user views event details:
+    - If currentUserId == event.userId → "Join Event" button is HIDDEN
+    - If currentUserId != event.userId → "Join Event" button is SHOWN
+
+
+================================================================================
+7. LIVE LOCATION SHARING MODULE — FULL DATA FLOW
+================================================================================
+
+FILES:
+  - data/repository/FirebaseLocationRepository.kt
+  - ui/map/MapViewModel.kt
+  - ui/map/LiveLocationMapScreen.kt
+  - location/LocationClient.kt
+  - location/DefaultLocationClient.kt
+
+BACKEND: Firebase Realtime Database → Node: "live_locations"
+
+
+7.1 START SHARING LOCATION
+───────────────────────────
+  User taps "Start Sharing" (optional duration in minutes)
+       │
+       ▼
+  MapViewModel.startSharingLocation(durationMinutes)
+       │
+       ▼
+  LocationClient.getLocationUpdates(interval = 5000ms)
+    → Uses FusedLocationProviderClient (Google Play Services)
+    → Emits android.location.Location every 5 seconds
+       │
+       ▼
+  For each location emission:
+    1. Fetch userName: usersRef.child(uid).child("name").get()
+    2. Construct UserLocation(userId, userName, lat, lng, timestamp)
+    3. Write to Realtime DB: locationRef.child(userId).setValue(userLocation)
+       │
+       ▼
+  If duration specified → countdown timer auto-stops sharing
+
+
+7.2 OBSERVE OTHER USERS' LOCATIONS (Real-time)
+────────────────────────────────────────────────
+  On ViewModel init → startObservingOthers()
+       │
+       ▼
+  FirebaseLocationRepository.observeLocations()
+    → locationRef.addValueEventListener(...)
+    → Reads all children under "live_locations"
+       │
+       ▼
+  Filters:
+    - Removes own user's location from the list
+    - Removes stale locations older than 2 minutes
+    - Auto-deletes stale entries from database
+       │
+       ▼
+  Emits List<UserLocation> via Flow → uiState.otherUsers
+       │
+       ▼
+  Map UI plots markers for each user
+
+
+7.3 STOP SHARING LOCATION
+───────────────────────────
+  User taps "Stop" or timer expires
+       │
+       ▼
+  MapViewModel.stopSharingLocation()
+    → Cancels location collection job
+    → Cancels timer job
+    → Removes own entry: locationRef.child(userId).removeValue()
+       │
+       ▼
+  Also called in onCleared() to prevent background GPS drain
+
+
+================================================================================
+8. IMAGE UPLOAD — CLOUDINARY INTEGRATION
+================================================================================
+
+FILE: util/CloudinaryUploader.kt
+SERVICE: Cloudinary REST API (unsigned upload, free tier)
+
+FLOW:
+  1. Read image bytes from content URI
+     → context.contentResolver.openInputStream(imageUri).readBytes()
+
+  2. Encode as Base64 data URL
+     → "data:image/jpeg;base64,<base64string>"
+
+  3. POST to Cloudinary Upload API
+     → URL: https://api.cloudinary.com/v1_1/{CLOUD_NAME}/image/upload
+     → Body (form):
+         file          = base64 data URL
+         upload_preset = "my_unsigned_upload"
+
+  4. Parse response JSON → extract "secure_url"
+     → Returns HTTPS URL of the uploaded image
+
+  Configuration:
+    Cloud Name:    dkhpxkzib
+    Upload Preset: my_unsigned_upload (unsigned, no API key needed)
+    Timeouts:      Connect 60s, Write 120s, Read 60s
+
+
+================================================================================
+9. NAVIGATION & SCREEN ROUTING
+================================================================================
+
+FILE: navigation/AppNavGraph.kt + MainActivity.kt
+
+FLOW:
+  MainActivity.onCreate()
+       │
+       ▼
+  Shows SplashScreen (animated logo, 2-sec delay)
+       │
+       ▼
+  Checks auth.currentUser:
+    - If logged in  → Dashboard (with bottom nav tabs)
+    - If not logged in → LoginScreen
+       │
+       ▼
+  Auth screens navigate between:
+    LoginScreen ↔ SignupScreen ↔ ForgotPasswordScreen ↔ OtpScreen
+       │
+       ▼
+  After login → DashboardRoot (contains bottom navigation):
+    Tab 1: TaskFeedScreen     (Active Tasks with Enroll)
+    Tab 2: EventsScreen       (Events Feed with Add/Edit/Join)
+    Tab 3: MapScreen          (Live Location / Map Picker)
+    Tab 4: ChatScreen         (Chat functionality)
+    Tab 5: ProfileScreen      (Profile + My Tasks + My Events)
+
+  AppNavGraph routes:
+    "dashboard_root" → DashboardRoot
+    "live_location"  → LiveLocationMapScreen
+
+
+================================================================================
+10. FIRESTORE SECURITY RULES
+================================================================================
+
+  Collection: "tasks"
+    - CREATE : Any authenticated user can create tasks
+    - READ   : Any authenticated user can read all tasks
+    - UPDATE : Owner can update anything;
+               Other users can ONLY update enrollment fields
+               (status, enrolledUserId, enrolledUserName)
+               and only if the task is currently "active"
+    - DELETE : Only the task owner (userId) can delete
+
+  Collection: "events"
+    - CREATE : Any authenticated user
+    - READ   : Any authenticated user
+    - UPDATE : Only the event publisher (userId)
+    - DELETE : Only the event publisher (userId)
+
+  Realtime Database: "users/{uid}"
+    - Read/Write: Only the authenticated user matching {uid}
+
+  Realtime Database: "live_locations/{uid}"
+    - Write: Only the authenticated user matching {uid}
+    - Read: Any authenticated user (to see others on the map)
+
+
+================================================================================
+11. FILE-BY-FILE REFERENCE
+================================================================================
+
+  Path                                              Purpose
+  ──────────────────────────────────────────────── ─────────────────────────────────────
+  model/Task.kt                                     Task data class (Firestore mapping)
+  model/Event.kt                                    Event data class (Firestore mapping)
+  model/UserLocation.kt                             Location data class (RTDB mapping)
+  data/repository/TaskRepository.kt                 Firestore CRUD operations for tasks
+  data/repository/EventRepository.kt                Firestore CRUD + Cloudinary for events
+  data/repository/FirebaseLocationRepository.kt     RTDB operations for live locations
+  ui/auth/AuthViewModel.kt                          Auth state management (sign-up/in/out)
+  ui/tasks/TaskViewModel.kt                         Task business logic + state
+  ui/events/EventViewModel.kt                       Event business logic + state
+  ui/map/MapViewModel.kt                            Location sharing logic + state
+  ui/screens/TaskFeedScreen.kt                      Active tasks feed UI
+  ui/events/EventScreen.kt                          Events feed + Add/Edit/Details UI
+  ui/profile/ProfileScreen.kt                       User profile + task/event history UI
+  ui/map/LiveLocationMapScreen.kt                   Google Map with live user markers
+  ui/map/MapPickerScreen.kt                         Map picker for selecting locations
+  util/CloudinaryUploader.kt                        Image upload to Cloudinary
+  location/LocationClient.kt                        Location provider interface
+  location/DefaultLocationClient.kt                 FusedLocationProvider implementation
+  navigation/AppNavGraph.kt                         Top-level Compose navigation
+  MainActivity.kt                                   Entry point, auth screens, splash
+
+
+================================================================================
+                              END OF DOCUMENTATION
+================================================================================

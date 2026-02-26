@@ -34,10 +34,14 @@ import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.example.taskbug.model.Event
-import java.time.Instant
-import java.time.LocalDate
-import java.time.ZoneOffset
-import java.time.format.DateTimeFormatter
+import java.text.SimpleDateFormat
+import java.util.Locale
+import androidx.compose.runtime.livedata.observeAsState
+import androidx.navigation.NavController
+import androidx.compose.runtime.saveable.rememberSaveable
+import android.app.TimePickerDialog
+import androidx.compose.ui.platform.LocalContext
+import java.util.Calendar
 
 /* ------------------------------------------------------------------ */
 /*  DESIGN TOKENS                                                       */
@@ -55,8 +59,11 @@ private val AppBorder      = Color(0xFFE5E7EB)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun EventsScreen(eventViewModel: EventViewModel = viewModel()) {
-    var showAddEventDialog  by remember { mutableStateOf(false) }
+fun EventsScreen(
+    navController: NavController,
+    eventViewModel: EventViewModel = viewModel()
+) {
+    var showAddEventDialog  by rememberSaveable { mutableStateOf(false) }
     var selectedEvent       by remember { mutableStateOf<Event?>(null) }
     var editingEvent        by remember { mutableStateOf<Event?>(null) }
 
@@ -130,6 +137,7 @@ fun EventsScreen(eventViewModel: EventViewModel = viewModel()) {
     // ── Dialogs ──────────────────────────────────────────────────────────────
     if (showAddEventDialog) {
         AddEventDialog(
+            navController = navController,
             isLoading  = uiState.isLoading || uiState.isUploading,
             onDismiss  = { showAddEventDialog = false },
             onSubmit   = { title, desc, date, time, venue, category, price, maxA, uri ->
@@ -142,6 +150,7 @@ fun EventsScreen(eventViewModel: EventViewModel = viewModel()) {
     selectedEvent?.let { ev ->
         EventDetailsPopup(
             event     = ev,
+            currentUserId = currentUserId,
             onDismiss = { selectedEvent = null }
         )
     }
@@ -320,17 +329,17 @@ fun HorizontalEventCard(
 }
 
 // Helper: yyyy-MM-dd → "Feb 24, 2026"
-private fun formatDisplayDate(isoDate: String): String = try {
-    val parts = isoDate.split("-")
-    if (parts.size == 3) {
-        val months = listOf("Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec")
-        val m = parts[1].toIntOrNull()?.minus(1) ?: return isoDate
-        "${months.getOrElse(m) { parts[1] }} ${parts[2]}, ${parts[0]}"
-    } else isoDate
-} catch (e: Exception) { isoDate }
-
-// Helper to read canEditEvent from the composable scope (forward ref workaround)
-private fun eventViewModel(dummy: Unit = Unit): EventViewModel = throw UnsupportedOperationException()
+private fun formatDisplayDate(dateStr: String): String {
+    if (dateStr.isEmpty()) return ""
+    return try {
+        val parser = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+        val formatter = SimpleDateFormat("MMM dd, yyyy", Locale.getDefault())
+        val d = parser.parse(dateStr)
+        if (d != null) formatter.format(d) else dateStr
+    } catch (e: Exception) {
+        dateStr
+    }
+}
 
 /* ================================================================== */
 /*  EMPTY STATE                                                         */
@@ -360,7 +369,7 @@ private fun EmptyEventsState() {
 /* ================================================================== */
 
 @Composable
-fun EventDetailsPopup(event: Event, onDismiss: () -> Unit) {
+fun EventDetailsPopup(event: Event, currentUserId: String?, onDismiss: () -> Unit) {
     Dialog(onDismissRequest = onDismiss) {
         Card(
             shape  = RoundedCornerShape(24.dp),
@@ -432,8 +441,10 @@ fun EventDetailsPopup(event: Event, onDismiss: () -> Unit) {
                         OutlinedButton(onClick = {}, Modifier.weight(1f).height(50.dp), shape = RoundedCornerShape(12.dp), border = BorderStroke(1.dp, AppTeal)) {
                             Text("Save", color = AppTeal)
                         }
-                        Button(onClick = {}, Modifier.weight(1f).height(50.dp), shape = RoundedCornerShape(12.dp), colors = ButtonDefaults.buttonColors(containerColor = AppTeal)) {
-                            Text("Join Event")
+                        if (currentUserId != null && currentUserId != event.userId) {
+                            Button(onClick = {}, Modifier.weight(1f).height(50.dp), shape = RoundedCornerShape(12.dp), colors = ButtonDefaults.buttonColors(containerColor = AppTeal)) {
+                                Text("Join Event")
+                            }
                         }
                     }
                 }
@@ -449,25 +460,54 @@ fun EventDetailsPopup(event: Event, onDismiss: () -> Unit) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddEventDialog(
+    navController: NavController,
     isLoading: Boolean,
     onDismiss: () -> Unit,
     onSubmit: (title: String, description: String, date: String, time: String, venue: String, category: String, ticketPrice: Double, maxAttendees: Int, imageUri: Uri) -> Unit
 ) {
-    var title        by remember { mutableStateOf("") }
-    var description  by remember { mutableStateOf("") }
-    var venue        by remember { mutableStateOf("") }
-    var date         by remember { mutableStateOf("") }   // yyyy-MM-dd
-    var time         by remember { mutableStateOf("") }   // display string
-    var category     by remember { mutableStateOf("") }
-    var priceStr     by remember { mutableStateOf("") }
-    var maxStr       by remember { mutableStateOf("") }
+    var title        by rememberSaveable { mutableStateOf("") }
+    var description  by rememberSaveable { mutableStateOf("") }
+    var venue        by rememberSaveable { mutableStateOf("") }
+    var date         by rememberSaveable { mutableStateOf("") }   // yyyy-MM-dd
+    var time         by rememberSaveable { mutableStateOf("") }   // display string
+    var category     by rememberSaveable { mutableStateOf("") }
+    var priceStr     by rememberSaveable { mutableStateOf("") }
+    var maxStr       by rememberSaveable { mutableStateOf("") }
     var imageUri     by remember { mutableStateOf<Uri?>(null) }
-    var titleError   by remember { mutableStateOf(false) }
-    var imageError   by remember { mutableStateOf(false) }
-    var dateError    by remember { mutableStateOf(false) }
+    var titleError   by rememberSaveable { mutableStateOf(false) }
+    var imageError   by rememberSaveable { mutableStateOf(false) }
+    var dateError    by rememberSaveable { mutableStateOf(false) }
+
+    val context = LocalContext.current
+    val calendar = Calendar.getInstance()
+    val timePickerDialog = remember {
+        TimePickerDialog(
+            context,
+            { _, hourOfDay, minute ->
+                val amPm = if (hourOfDay >= 12) "PM" else "AM"
+                val hour12 = if (hourOfDay % 12 == 0) 12 else hourOfDay % 12
+                time = String.format(Locale.getDefault(), "%02d:%02d %s", hour12, minute, amPm)
+            },
+            calendar.get(Calendar.HOUR_OF_DAY),
+            calendar.get(Calendar.MINUTE),
+            false // 12 hour format
+        )
+    }
 
     val galleryLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         uri?.let { imageUri = it; imageError = false }
+    }
+
+    // Observe result from MapPickerScreen
+    val savedStateHandle = navController.currentBackStackEntry?.savedStateHandle
+    val selectedLocation = savedStateHandle?.getLiveData<String>("selected_location")?.observeAsState()
+    
+    LaunchedEffect(selectedLocation?.value) {
+        val loc = selectedLocation?.value
+        if (!loc.isNullOrBlank()) {
+            venue = loc
+            savedStateHandle?.remove<String>("selected_location")
+        }
     }
 
     Dialog(onDismissRequest = onDismiss) {
@@ -540,14 +580,30 @@ fun AddEventDialog(
                         onValueChange = { time = it },
                         label         = "Time (e.g. 06:00 PM)",
                         modifier      = Modifier.weight(1f),
-                        leadingIcon   = Icons.Default.AccessTime
+                        leadingIcon   = Icons.Default.AccessTime,
+                        readOnly      = true,
+                        onClick       = { timePickerDialog.show() }
                     )
                 }
                 if (dateError) Text("Event date is required", fontSize = 12.sp, color = Color(0xFFDC2626))
 
                 // ── Venue ─────────────────────────────────────────────────────
-                EventTextField(value = venue, onValueChange = { venue = it },
-                    label = "Venue / Location", leadingIcon = Icons.Default.Place)
+                EventTextField(
+                    value = venue, 
+                    onValueChange = { venue = it },
+                    label = "Venue / Location", 
+                    leadingIcon = Icons.Default.Place,
+                    trailingIcon = {
+                        Icon(
+                            Icons.Default.Place,
+                            contentDescription = "Pick Location",
+                            modifier = Modifier.size(24.dp).clickable { 
+                                navController.navigate("map_picker") 
+                            },
+                            tint = AppTeal
+                        )
+                    }
+                )
 
                 // ── Price & Capacity ──────────────────────────────────────────
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -769,10 +825,9 @@ fun EventDatePickerButton(
     val initialMillis = remember(date) {
         if (date.isNotEmpty()) {
             try {
-                LocalDate.parse(date)
-                    .atStartOfDay(ZoneOffset.UTC)
-                    .toInstant()
-                    .toEpochMilli()
+                val parser = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+                val d = parser.parse(date)
+                d?.time
             } catch (e: Exception) { null }
         } else null
     }
@@ -826,10 +881,8 @@ fun EventDatePickerButton(
             confirmButton = {
                 TextButton(onClick = {
                     datePickerState.selectedDateMillis?.let { millis ->
-                        val selected = Instant.ofEpochMilli(millis)
-                            .atZone(ZoneOffset.UTC)
-                            .toLocalDate()
-                            .format(DateTimeFormatter.ISO_LOCAL_DATE)   // yyyy-MM-dd
+                        val formatter = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+                        val selected = formatter.format(java.util.Date(millis))
                         onDateSelected(selected)
                     }
                     showPicker = false
@@ -871,27 +924,41 @@ private fun EventTextField(
     errorMsg: String? = null,
     keyboardType: KeyboardType = KeyboardType.Text,
     leadingIcon: ImageVector? = null,
-    placeholder: String = ""
+    trailingIcon: @Composable (() -> Unit)? = null,
+    placeholder: String = "",
+    readOnly: Boolean = false,
+    onClick: (() -> Unit)? = null
 ) {
     Column(modifier = modifier) {
-        OutlinedTextField(
-            value         = value,
-            onValueChange = onValueChange,
-            label         = { Text(label) },
-            modifier      = Modifier.fillMaxWidth(),
-            minLines      = minLines,
-            isError       = isError,
-            shape         = RoundedCornerShape(12.dp),
-            placeholder   = if (placeholder.isNotEmpty()) ({ Text(placeholder, color = Color(0xFF9CA3AF)) }) else null,
-            leadingIcon   = leadingIcon?.let { icon -> { Icon(icon, null, Modifier.size(20.dp)) } },
-            keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
-            colors        = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor   = AppTeal,
-                unfocusedBorderColor = AppBorder,
-                focusedLabelColor    = AppTeal,
-                cursorColor          = AppTeal
+        val interactionModifier = if (onClick != null) Modifier.clickable { onClick() } else Modifier
+        Box(modifier = Modifier.fillMaxWidth().then(interactionModifier)) {
+            OutlinedTextField(
+                value         = value,
+                onValueChange = onValueChange,
+                label         = { Text(label) },
+                modifier      = Modifier.fillMaxWidth(),
+                minLines      = minLines,
+                isError       = isError,
+                readOnly      = readOnly || onClick != null,
+                enabled       = onClick == null, 
+                shape         = RoundedCornerShape(12.dp),
+                placeholder   = if (placeholder.isNotEmpty()) ({ Text(placeholder, color = Color(0xFF9CA3AF)) }) else null,
+                leadingIcon   = leadingIcon?.let { icon -> { Icon(icon, null, Modifier.size(20.dp)) } },
+                trailingIcon  = trailingIcon,
+                keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
+                colors        = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor   = AppTeal,
+                    unfocusedBorderColor = AppBorder,
+                    focusedLabelColor    = AppTeal,
+                    cursorColor          = AppTeal,
+                    disabledTextColor    = TextPrimary,
+                    disabledBorderColor  = AppBorder,
+                    disabledLabelColor   = TextSecondary,
+                    disabledLeadingIconColor = AppTeal,
+                    disabledTrailingIconColor = AppTeal
+                )
             )
-        )
+        }
         if (errorMsg != null) {
             Text(errorMsg, fontSize = 11.sp, color = Color(0xFFDC2626), modifier = Modifier.padding(start = 4.dp, top = 2.dp))
         }

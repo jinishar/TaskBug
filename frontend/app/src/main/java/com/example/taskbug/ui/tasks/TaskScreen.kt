@@ -14,6 +14,7 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.taskbug.ui.screens.AddTaskScreen
 import com.example.taskbug.ui.screens.TaskFeedScreen
+import androidx.navigation.NavController
 
 private val AppTeal = Color(0xFF0F766E)
 private val AppBackground = Color(0xFFF9FAFB)
@@ -21,6 +22,7 @@ private val AppBackground = Color(0xFFF9FAFB)
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TasksScreen(
+    navController: NavController,
     viewModel: TaskViewModel = viewModel()
 ) {
     var showAddTaskDialog by remember { mutableStateOf(false) }
@@ -51,6 +53,7 @@ fun TasksScreen(
                 properties = DialogProperties(usePlatformDefaultWidth = false)
             ) {
                 AddTaskScreen(
+                    navController = navController,
                     onTaskCreated = { showAddTaskDialog = false },
                     onDismiss = { showAddTaskDialog = false }
                 )

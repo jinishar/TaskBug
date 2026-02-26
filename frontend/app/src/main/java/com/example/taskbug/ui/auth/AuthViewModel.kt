@@ -23,7 +23,13 @@ class AuthViewModel : ViewModel() {
 
     private val auth: FirebaseAuth = Firebase.auth
     // Correctly initialize FirebaseDatabase to resolve build error
-    private val database = FirebaseDatabase.getInstance("https://taskbugcu-default-rtdb.asia-southeast1.firebasedatabase.app")
+    private val database: FirebaseDatabase by lazy {
+        try {
+            FirebaseDatabase.getInstance("https://taskbugcu-default-rtdb.asia-southeast1.firebasedatabase.app")
+        } catch (e: Exception) {
+            FirebaseDatabase.getInstance()
+        }
+    }
     private val usersRef = database.getReference("users")
 
     private val _isLoading = MutableStateFlow(false)
@@ -92,11 +98,11 @@ class AuthViewModel : ViewModel() {
     private fun fetchCurrentUserProfile() {
         val user = auth.currentUser
         if (user != null) {
-            viewModelScope.launch {
-                _isLoading.value = true
-                _authError.value = null
-                try {
-                    val snapshot = usersRef.child(user.uid).get().await()
+            _isLoading.value = true
+            _authError.value = null
+
+            usersRef.child(user.uid).addListenerForSingleValueEvent(object : com.google.firebase.database.ValueEventListener {
+                override fun onDataChange(snapshot: com.google.firebase.database.DataSnapshot) {
                     if (snapshot.exists()) {
                         _userProfile.value = snapshot.getValue(UserProfile::class.java)
                         if (_userProfile.value == null) {
@@ -105,12 +111,14 @@ class AuthViewModel : ViewModel() {
                     } else {
                         _authError.value = "Profile data does not exist."
                     }
-                } catch (e: Exception) {
-                    _authError.value = "Failed to load profile: ${e.message}"
-                } finally {
                     _isLoading.value = false
                 }
-            }
+
+                override fun onCancelled(error: com.google.firebase.database.DatabaseError) {
+                    _authError.value = "Failed to load profile: ${error.message}"
+                    _isLoading.value = false
+                }
+            })
         }
     }
 

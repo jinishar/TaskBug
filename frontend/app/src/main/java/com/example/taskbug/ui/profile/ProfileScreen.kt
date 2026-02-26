@@ -1,6 +1,7 @@
 package com.example.taskbug.ui.profile
 
 import android.app.Activity
+import androidx.compose.animation.AnimatedVisibility
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -29,6 +30,7 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import android.widget.Toast
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
@@ -57,7 +59,8 @@ private val LightGrayBackground = Color(0xFFF9FAFB)
 fun ProfileScreen(
     authViewModel: AuthViewModel = viewModel(),
     taskViewModel: TaskViewModel = viewModel(),
-    eventViewModel: EventViewModel = viewModel()
+    eventViewModel: EventViewModel = viewModel(),
+    onNavigateToLiveLocation: () -> Unit = {}
 ) {
     val scrollState = rememberScrollState()
     var selectedAvatar by remember { mutableStateOf(bugAvatars.first()) }
@@ -77,6 +80,7 @@ fun ProfileScreen(
     // Observe user's own tasks from TaskViewModel
     val taskUiState by taskViewModel.uiState.collectAsState()
     val userTasks = taskUiState.userTasks
+    val enrolledTasks = taskUiState.enrolledTasks
     val isTasksLoading = taskUiState.isLoading
 
     // Observe user's own events from EventViewModel
@@ -86,7 +90,7 @@ fun ProfileScreen(
 
     // Initialize Places SDK
     if (!Places.isInitialized()) {
-        Places.initialize(context.applicationContext, "YOUR_API_KEY")
+        Places.initialize(context.applicationContext, context.getString(com.example.taskbug.R.string.google_maps_api_key))
     }
 
     // Launcher for the Google Places Autocomplete activity
@@ -149,6 +153,20 @@ fun ProfileScreen(
                 editingEvent = null
             }
         )
+    }
+
+    LaunchedEffect(taskUiState.error) {
+        taskUiState.error?.let {
+            Toast.makeText(context, it, Toast.LENGTH_LONG).show()
+            taskViewModel.clearError()
+        }
+    }
+
+    LaunchedEffect(taskUiState.successMessage) {
+        taskUiState.successMessage?.let {
+            Toast.makeText(context, it, Toast.LENGTH_SHORT).show()
+            taskViewModel.clearSuccessMessage()
+        }
     }
 
     Scaffold(
@@ -377,6 +395,12 @@ fun ProfileScreen(
                             onClick = { showMyEventsHistory = !showMyEventsHistory }
                         )
                         HorizontalDivider(color = Color(0xFFF3F4F6))
+                        MenuListItem(
+                            icon = Icons.Default.Place, 
+                            title = "Live Location Map", 
+                            onClick = onNavigateToLiveLocation 
+                        )
+                        HorizontalDivider(color = Color(0xFFF3F4F6))
                         MenuListItem(icon = Icons.Default.AccountBalanceWallet, title = "Wallet")
                         HorizontalDivider(color = Color(0xFFF3F4F6))
                         MenuListItem(icon = Icons.Default.Settings, title = "Settings", onClick = { showSettings = true })
@@ -464,13 +488,69 @@ fun ProfileScreen(
                                         userTasks.forEach { task ->
                                             MyTaskHistoryCard(
                                                 task = task,
-                                                onDelete = { taskViewModel.deleteTask(task.id, task.userId) }
+                                                onDelete = { taskViewModel.deleteTask(task.id, task.userId) },
+                                                onMarkCompleted = { taskViewModel.markTaskCompleted(task.id) }
                                             )
                                         }
                                     }
                                 }
                             }
                         }
+
+                        // --- ENROLLED TASKS SECTION ---
+                        var expandedEnrolledTasks by remember { mutableStateOf(false) }
+                        
+                        // Enrolled Tasks Header
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { expandedEnrolledTasks = !expandedEnrolledTasks }
+                                .padding(horizontal = 20.dp, vertical = 12.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.AutoMirrored.Filled.Assignment, contentDescription = null, tint = TaskBugTeal)
+                                Spacer(modifier = Modifier.width(16.dp))
+                                Text("My Enrolled Tasks", fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFF374151))
+                            }
+                            Icon(
+                                if (expandedEnrolledTasks) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                                contentDescription = null,
+                                tint = Color(0xFF9CA3AF)
+                            )
+                        }
+                        
+                        // Enrolled Tasks Content
+                        AnimatedVisibility(visible = expandedEnrolledTasks) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .background(Color(0xFFF9FAFB))
+                                    .padding(horizontal = 20.dp, vertical = 16.dp)
+                            ) {
+                                if (enrolledTasks.isEmpty()) {
+                                    Text(
+                                        text = "You haven't enrolled in any tasks yet.",
+                                        fontSize = 14.sp,
+                                        color = Color(0xFF6B7280),
+                                        modifier = Modifier.padding(vertical = 12.dp)
+                                    )
+                                } else {
+                                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                        enrolledTasks.forEach { task ->
+                                            MyTaskHistoryCard(
+                                                task = task,
+                                                onDelete = null,
+                                                onMarkCompleted = null
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        HorizontalDivider(color = Color(0xFFF3F4F6), modifier = Modifier.padding(horizontal = 20.dp))
                     }
 
                     // --- MY POSTED EVENTS HISTORY ---
@@ -597,7 +677,8 @@ fun ProfileScreen(
 @Composable
 fun MyTaskHistoryCard(
     task: Task,
-    onDelete: () -> Unit
+    onDelete: (() -> Unit)? = null,
+    onMarkCompleted: (() -> Unit)? = null
 ) {
     var showDeleteConfirm by remember { mutableStateOf(false) }
 
@@ -688,17 +769,34 @@ fun MyTaskHistoryCard(
                 }
             }
 
+            // Mark Completed button for owners
+            if (onMarkCompleted != null && task.status == "assigned") {
+                IconButton(
+                    onClick = onMarkCompleted,
+                    modifier = Modifier.size(36.dp)
+                ) {
+                    Icon(
+                        Icons.Default.CheckCircle,
+                        contentDescription = "Mark Completed",
+                        tint = Color(0xFF059669),
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+            }
+
             // Delete button
-            IconButton(
-                onClick = { showDeleteConfirm = true },
-                modifier = Modifier.size(36.dp)
-            ) {
-                Icon(
-                    Icons.Default.Delete,
-                    contentDescription = "Delete Task",
-                    tint = Color(0xFFEF4444),
-                    modifier = Modifier.size(20.dp)
-                )
+            if (onDelete != null) {
+                IconButton(
+                    onClick = { showDeleteConfirm = true },
+                    modifier = Modifier.size(36.dp)
+                ) {
+                    Icon(
+                        Icons.Default.Delete,
+                        contentDescription = "Delete Task",
+                        tint = Color(0xFFEF4444),
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
             }
         }
     }
@@ -711,7 +809,7 @@ fun MyTaskHistoryCard(
             text = { Text("Are you sure you want to delete \"${task.title}\"? This cannot be undone.") },
             confirmButton = {
                 TextButton(onClick = {
-                    onDelete()
+                    onDelete?.invoke()
                     showDeleteConfirm = false
                 }) {
                     Text("Delete", color = Color(0xFFEF4444), fontWeight = FontWeight.Bold)

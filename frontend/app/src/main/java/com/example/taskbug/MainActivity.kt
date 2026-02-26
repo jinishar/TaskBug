@@ -48,6 +48,23 @@ class MainActivity : ComponentActivity() {
             MaterialTheme {
                 val userLoggedIn by authViewModel.userLoggedIn.collectAsState()
                 val signUpSuccess by authViewModel.signUpSuccess.collectAsState()
+                val authError by authViewModel.authError.collectAsState()
+                
+                val context = androidx.compose.ui.platform.LocalContext.current
+                var wasLoggedIn by remember { mutableStateOf(userLoggedIn) }
+
+                LaunchedEffect(userLoggedIn) {
+                    if (userLoggedIn && !wasLoggedIn) {
+                        android.widget.Toast.makeText(context, "Login Successful!", android.widget.Toast.LENGTH_SHORT).show()
+                    }
+                    wasLoggedIn = userLoggedIn
+                }
+
+                LaunchedEffect(authError) {
+                    authError?.let { errorMsg ->
+                        android.widget.Toast.makeText(context, errorMsg, android.widget.Toast.LENGTH_LONG).show()
+                    }
+                }
 
                 if (userLoggedIn) {
                     AppNavGraph(authViewModel = authViewModel) // If user is logged in, show the main app

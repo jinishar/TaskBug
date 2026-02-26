@@ -32,7 +32,11 @@ fun DashboardRoot(authViewModel: AuthViewModel) {
             }
         },
         bottomBar = {
-            BottomBar(navController = navController)
+            // Only show bottom bar on main tabs
+            val mainRoutes = listOf("tasks", "events", "chat", "profile")
+            if (currentRoute in mainRoutes) {
+                BottomBar(navController = navController)
+            }
         }
     ) { innerPadding ->
         NavHost(
@@ -40,10 +44,33 @@ fun DashboardRoot(authViewModel: AuthViewModel) {
             startDestination = "tasks",
             modifier = Modifier.padding(innerPadding)
         ) {
-            composable("tasks") { TasksScreen() }
-            composable("events") { EventsScreen() }
+            composable("tasks") { com.example.taskbug.ui.tasks.TasksScreen(navController = navController) }
+            composable("events") { com.example.taskbug.ui.events.EventsScreen(navController = navController) }
             composable("chat") { ChatScreen() }
-            composable("profile") { ProfileScreen(authViewModel = authViewModel) }
+            composable("profile") { 
+                ProfileScreen(
+                    authViewModel = authViewModel,
+                    onNavigateToLiveLocation = { navController.navigate("live_location") }
+                ) 
+            }
+            composable("live_location") {
+                com.example.taskbug.ui.map.LiveLocationMapScreen(
+                    onNavigateBack = { navController.popBackStack() }
+                )
+            }
+            composable(
+                route = "map_picker"
+            ) { backStackEntry ->
+                // The caller can retrieve the result from the previous back stack entry's savedStateHandle
+                com.example.taskbug.ui.map.MapPickerScreen(
+                    onLocationSelected = { location ->
+                        navController.previousBackStackEntry
+                            ?.savedStateHandle
+                            ?.set("selected_location", location)
+                    },
+                    onNavigateBack = { navController.popBackStack() }
+                )
+            }
         }
     }
 }
